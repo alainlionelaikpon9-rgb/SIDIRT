@@ -1755,14 +1755,101 @@ function updateLCD(temp, gaz, flamme) {
   }
 }
 
-// ============ SENSOR SIMULATION ============
-setInterval(() => {
-  if (fireState) {
-    updateSensors(randomBetween(58, 72), randomBetween(380, 460), randomBetween(140, 240));
-  } else {
-    updateSensors(randomBetween(22, 36), randomBetween(80, 180), randomBetween(700, 950));
+// ============ SUPABASE REAL DATA ============
+const SUPABASE_URL = 'https://dufnwjzrvbtkjtvfialj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9-yUYWHtc__pvypx3uBXHw_65i2sYS7';
+
+let supabaseConnected = false;
+let lastFetchFailed = false;
+
+async function fetchSupabase() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/capteurs?select=*&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      }
+    );
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (data && data.length > 0) {
+      const d = data[0];
+      const temp   = parseFloat(d.temperature) || 0;
+      const gaz    = parseInt(d.gaz) || 0;
+      const flamme = d.flamme ? 150 : 850; // flamme=true → valeur basse (détectée)
+      const verr   = d.verrouille;
+
+      updateSensors(temp, gaz, flamme);
+
+      // Sync état verrou
+      if (verr && !fireState) simulateFire();
+      else if (!verr && fireState) simulateNormal();
+
+      // Indicateur connexion
+      if (!supabaseConnected || lastFetchFailed) {
+        supabaseConnected = true;
+        lastFetchFailed = false;
+        document.getElementById('esp32Dot').className = 'status-dot';
+        document.getElementById('esp32Status').textContent = 'ESP32-S Connecté ✓';
+        showToast('✅ Données ESP32 reçues en direct', 'success');
+        addHistoryEvent("Connexion Supabase établie — données ESP32 reçues", "systeme", "OK", "safe");
+      }
+    }
+  } catch (err) {
+    console.warn('Supabase fetch error:', err);
+    lastFetchFailed = true;
+    // Fallback simulation si pas de données
+    if (!supabaseConnected) {
+      if (fireState) {
+        updateSensors(randomBetween(58, 72), randomBetween(380, 460), randomBetween(140, 240));
+      } else {
+        updateSensors(randomBetween(22, 36), randomBetween(80, 180), randomBetween(700, 950));
+      }
+    }
+    document.getElementById('esp32Dot').className = 'status-dot warning';
+    document.getElementById('esp32Status').textContent = 'En attente ESP32...';
   }
-}, 2000);
+}
+
+// Fetch toutes les 2 secondes (même intervalle que l'ESP32)
+fetchSupabase();
+setInterval(fetchSupabase, 2000);
+
+// Aussi charger l'historique depuis Supabase
+async function fetchHistorique() {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/capteurs?select=*&order=created_at.desc&limit=50`,
+      {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data || data.length === 0) return;
+
+    // Ajouter les vraies données à l'historique
+    data.forEach(d => {
+      const t = new Date(d.created_at);
+      if (d.flamme) {
+        const exists = historyLog.some(e => e.desc.includes('Supabase') && Math.abs(new Date(e.time) - t) < 5000);
+        if (!exists) {
+          historyLog.push({ time: t, desc: 'Flamme détectée (données ESP32 réelles)', type: 'flamme', val: '<300', severity: 'danger' });
+        }
+      }
+    });
+    renderHistory();
+  } catch(e) {}
+}
+setInterval(fetchHistorique, 10000);
 
 // ============ PAGE NAVIGATION ============
 const pageTitles = {
@@ -1876,6 +1963,23 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     showToast(`📊 Plage modifiée : ${this.textContent}`, 'info');
   });
 });
+
+// ============ VIDEO NGROK ============
+function updateVideoSrc(url) {
+  if (!url || url.trim() === '') return;
+  url = url.trim();
+  if (!url.startsWith('http')) url = 'https://' + url;
+  const wrapper = document.getElementById('videoIframeWrapper');
+  const iframe  = document.getElementById('videoIframe');
+  if (wrapper && iframe) {
+    iframe.src = url;
+    wrapper.style.display = 'block';
+    showToast('📹 Flux vidéo connecté : ' + url, 'success');
+    // Update camera badge
+    setCameraActive(true);
+    document.getElementById('camLabel2').innerHTML = `⚡ Flux en direct depuis ngrok<br><span style="font-size:10px; color:var(--accent-cyan);">${url}</span>`;
+  }
+}
 
 // ============ INIT ============
 updateSensors(26, 120, 820);
