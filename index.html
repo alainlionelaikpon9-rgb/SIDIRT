@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIDIRT — Système Intelligent de Détection d'Incendie en Temps Réel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-dark: #070b12;
+  --bg-panel: #0d1420;
+  --bg-card: #111b2b;
+  --bg-card2: #0f1825;
+  --accent-fire: #ff4500;
+  --accent-orange: #ff7700;
+  --accent-amber: #ffb300;
+  --accent-cyan: #00d4ff;
+  --accent-green: #00e676;
+  --accent-red: #ff1744;
+  --text-primary: #e8f0fe;
+  --text-secondary: #7a9cc0;
+  --text-muted: #3a5a7a;
+  --border: #1a2e45;
+  --border-glow: #1e3d5c;
+  --safe: #00e676;
+  --warning: #ffb300;
+  --danger: #ff1744;
+  --fire: #ff4500;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Exo 2', sans-serif;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 230px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
+
+.logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo-icon {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, var(--accent-fire), var(--accent-amber));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  margin-bottom: 10px;
+  box-shadow: 0 0 20px rgba(255,69,0,0.4);
+}
+
+.logo-name {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--text-primary);
+}
+
+.logo-sub {
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.nav {
+  padding: 16px 12px;
+  flex: 1;
+}
+
+.nav-section {
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 12px 8px 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  user-select: none;
+}
+
+.nav-item:hover { background: rgba(0,212,255,0.06); color: var(--text-primary); }
+.nav-item.active {
+  background: rgba(255,69,0,0.12);
+  color: var(--accent-orange);
+  border-left: 2px solid var(--accent-fire);
+}
+
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+.status-bar {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.sys-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--safe);
+  box-shadow: 0 0 8px var(--safe);
+  animation: pulse 2s infinite;
+}
+
+.status-dot.warning { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+.status-dot.danger  { background: var(--danger);  box-shadow: 0 0 8px var(--danger);  }
+
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ===== MAIN ===== */
+.main {
+  margin-left: 230px;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== TOPBAR ===== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  height: 60px;
+  background: rgba(13,20,32,0.95);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 50;
+}
+
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.page-title { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 1px; }
+.page-breadcrumb { font-size: 11px; color: var(--text-muted); }
+
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+
+.time-display {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--accent-cyan);
+  background: rgba(0,212,255,0.06);
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,212,255,0.15);
+}
+
+.alert-badge {
+  position: relative;
+  width: 34px; height: 34px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px;
+  transition: background 0.2s;
+}
+.alert-badge:hover { background: rgba(255,23,68,0.1); }
+
+.badge-count {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 16px; height: 16px;
+  background: var(--danger);
+  border-radius: 8px;
+  font-size: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  padding: 0 3px;
+}
+
+.user-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+}
+
+.user-avatar {
+  width: 26px; height: 26px;
+  background: linear-gradient(135deg, var(--accent-fire), var(--accent-amber));
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+
+.user-name { font-size: 12px; font-weight: 600; }
+
+/* ===== MOBILE HAMBURGER ===== */
+.hamburger {
+  display: none;
+  flex-direction: column; gap: 5px;
+  cursor: pointer; padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-card);
+}
+.hamburger span {
+  display: block; width: 18px; height: 2px;
+  background: var(--text-secondary); border-radius: 2px;
+  transition: all 0.3s;
+}
+
+/* ===== CONTENT PAGES ===== */
+.page { display: none; padding: 24px 28px; }
+.page.active { display: block; }
+
+/* ===== ALERT BANNER ===== */
+.alert-banner {
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(135deg, rgba(255,23,68,0.15), rgba(255,69,0,0.1));
+  border: 1px solid rgba(255,23,68,0.4);
+  border-radius: 10px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  animation: alertPulse 1.5s infinite;
+}
+
+@keyframes alertPulse {
+  0%,100% { border-color: rgba(255,23,68,0.4); box-shadow: 0 0 0 rgba(255,23,68,0); }
+  50% { border-color: rgba(255,23,68,0.8); box-shadow: 0 0 20px rgba(255,23,68,0.15); }
+}
+
+.alert-icon { font-size: 24px; }
+.alert-text { flex: 1; }
+.alert-title { font-weight: 700; font-size: 15px; color: var(--danger); }
+.alert-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.alert-time { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-muted); }
+
+/* ===== SENSOR CARDS ===== */
+.sensors-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.sensor-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.sensor-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 12px 12px 0 0;
+}
+
+.sensor-card.safe::before { background: var(--safe); }
+.sensor-card.warning::before { background: var(--warning); }
+.sensor-card.danger::before { background: var(--danger); }
+
+.sensor-card.danger { border-color: rgba(255,23,68,0.3); box-shadow: 0 0 16px rgba(255,23,68,0.06); }
+.sensor-card.warning { border-color: rgba(255,179,0,0.3); box-shadow: 0 0 16px rgba(255,179,0,0.06); }
+.sensor-card.safe { border-color: rgba(0,230,118,0.2); }
+
+.sensor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sensor-name {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+
+.sensor-badge {
+  font-size: 9px; font-weight: 700;
+  padding: 3px 8px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+
+.badge-safe { background: rgba(0,230,118,0.15); color: var(--safe); border: 1px solid rgba(0,230,118,0.3); }
+.badge-warning { background: rgba(255,179,0,0.15); color: var(--warning); border: 1px solid rgba(255,179,0,0.3); }
+.badge-danger { background: rgba(255,23,68,0.15); color: var(--danger); border: 1px solid rgba(255,23,68,0.3); }
+
+.sensor-value-row {
+  display: flex; align-items: flex-end; gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sensor-value {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 48px;
+  line-height: 1;
+  transition: color 0.4s;
+}
+
+.sensor-unit { font-size: 14px; color: var(--text-secondary); margin-bottom: 8px; }
+.sensor-icon { font-size: 32px; position: absolute; top: 16px; right: 16px; opacity: 0.12; }
+
+.progress-bar {
+  height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  overflow: hidden; margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.fill-safe { background: linear-gradient(90deg, var(--safe), #69f0ae); }
+.fill-warning { background: linear-gradient(90deg, var(--warning), #ffd740); }
+.fill-danger { background: linear-gradient(90deg, var(--danger), #ff5252); }
+
+.sensor-threshold {
+  font-size: 10px; color: var(--text-muted);
+  display: flex; justify-content: space-between;
+}
+
+/* ===== RELAY STATUS ===== */
+.relay-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.relay-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex; align-items: center; gap: 16px;
+  transition: border-color 0.3s;
+}
+
+.relay-indicator {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  transition: all 0.4s;
+}
+
+.relay-on {
+  background: rgba(0,230,118,0.12);
+  border: 2px solid rgba(0,230,118,0.4);
+  box-shadow: 0 0 20px rgba(0,230,118,0.2);
+}
+
+.relay-off {
+  background: rgba(255,23,68,0.12);
+  border: 2px solid rgba(255,23,68,0.4);
+  box-shadow: 0 0 20px rgba(255,23,68,0.2);
+}
+
+.relay-info { flex: 1; }
+.relay-label { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+.relay-state { font-size: 11px; color: var(--text-muted); }
+.relay-state span { font-weight: 600; }
+.relay-state .state-on { color: var(--safe); }
+.relay-state .state-off { color: var(--danger); }
+
+.relay-toggle {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+  font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  font-family: 'Exo 2', sans-serif;
+}
+.relay-toggle:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); border-color: var(--accent-cyan); }
+
+/* ===== BOTTOM GRID ===== */
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+}
+
+/* ===== VIDEO FEED ===== */
+.video-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 15px; letter-spacing: 1px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.live-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  background: var(--danger); color: white;
+  padding: 2px 8px; border-radius: 4px;
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.video-area {
+  position: relative;
+  background: #000;
+  aspect-ratio: 16/9;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+
+.video-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  color: var(--text-muted);
+}
+
+.cam-icon { font-size: 40px; opacity: 0.4; }
+.cam-label { font-size: 12px; letter-spacing: 1px; }
+
+.video-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  width: 20px; height: 20px;
+  border-color: rgba(0,212,255,0.5);
+  border-style: solid;
+}
+.corner.tl { top: 10px; left: 10px; border-width: 2px 0 0 2px; }
+.corner.tr { top: 10px; right: 10px; border-width: 2px 2px 0 0; }
+.corner.bl { bottom: 10px; left: 10px; border-width: 0 0 2px 2px; }
+.corner.br { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; }
+
+.video-info {
+  position: absolute; bottom: 10px; left: 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px; color: rgba(0,212,255,0.7);
+  line-height: 1.6;
+}
+
+.cam-status-badge {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  background: rgba(0,0,0,0.6); color: var(--text-muted);
+  padding: 3px 10px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.cam-status-badge.active-cam {
+  color: var(--danger);
+  border-color: rgba(255,23,68,0.5);
+}
+
+/* ===== SMS LOG ===== */
+.sms-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+.sms-list { flex: 1; overflow-y: auto; max-height: 260px; }
+
+.sms-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  display: flex; gap: 10px;
+}
+
+.sms-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; flex-shrink: 0;
+  font-weight: 700;
+}
+
+.sms-avatar.auth { background: rgba(255,179,0,0.2); color: var(--warning); border: 1px solid rgba(255,179,0,0.3); }
+.sms-avatar.owner { background: rgba(0,212,255,0.15); color: var(--accent-cyan); border: 1px solid rgba(0,212,255,0.3); }
+
+.sms-content { flex: 1; min-width: 0; }
+.sms-recipient { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+.sms-text { font-size: 10px; color: var(--text-secondary); line-height: 1.4; word-break: break-word; }
+.sms-time { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-muted); margin-top: 4px; }
+
+.sms-status {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 3px; align-self: flex-start; flex-shrink: 0;
+}
+.sms-sent { background: rgba(0,230,118,0.15); color: var(--safe); }
+.sms-pending { background: rgba(255,179,0,0.15); color: var(--warning); }
+
+/* ===== GRAPHIQUE PAGE ===== */
+.chart-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.chart-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 15px; letter-spacing: 1px;
+  margin-bottom: 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px;
+}
+
+.chart-legend {
+  display: flex; gap: 20px; flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-secondary);
+}
+
+.legend-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+
+canvas { width: 100% !important; }
+
+.chart-filters {
+  display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Exo 2', sans-serif;
+}
+
+.filter-btn.active, .filter-btn:hover {
+  background: rgba(255,69,0,0.1);
+  border-color: rgba(255,69,0,0.4);
+  color: var(--accent-orange);
+}
+
+/* ===== HISTORIQUE PAGE ===== */
+.history-table {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 140px 1fr 120px 100px 80px;
+  padding: 12px 20px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border);
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-muted);
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 120px 100px 80px;
+  padding: 13px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  font-size: 12px; align-items: center;
+  transition: background 0.15s;
+}
+
+.table-row:hover { background: rgba(255,255,255,0.02); }
+
+.event-type {
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  padding: 3px 8px; border-radius: 4px;
+  display: inline-block;
+}
+
+.evt-flamme { background: rgba(255,69,0,0.2); color: var(--accent-fire); }
+.evt-gaz { background: rgba(255,179,0,0.15); color: var(--warning); }
+.evt-temp { background: rgba(0,212,255,0.12); color: var(--accent-cyan); }
+.evt-sms { background: rgba(0,230,118,0.12); color: var(--safe); }
+.evt-systeme { background: rgba(255,255,255,0.06); color: var(--text-secondary); }
+
+.severity-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; margin-right: 6px;
+}
+
+/* ===== PARAMETRES PAGE ===== */
+.params-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.param-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.param-card-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 15px; letter-spacing: 1px;
+  margin-bottom: 16px;
+  color: var(--accent-cyan);
+  display: flex; align-items: center; gap: 8px;
+}
+
+.param-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  gap: 12px;
+}
+
+.param-row:last-child { border-bottom: none; }
+
+.param-label { font-size: 13px; font-weight: 600; }
+.param-desc { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+.param-input {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  padding: 6px 10px;
+  width: 100px; text-align: right;
+  outline: none;
+  transition: border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.param-input:focus { border-color: var(--accent-cyan); }
+
+.toggle-switch {
+  width: 42px; height: 22px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 11px;
+  position: relative; cursor: pointer;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+
+.toggle-switch.on { background: var(--safe); box-shadow: 0 0 12px rgba(0,230,118,0.3); }
+
+.toggle-knob {
+  position: absolute;
+  width: 16px; height: 16px;
+  background: white; border-radius: 50%;
+  top: 3px; left: 3px;
+  transition: left 0.3s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.toggle-switch.on .toggle-knob { left: 23px; }
+
+.save-btn {
+  width: 100%;
+  padding: 11px;
+  background: linear-gradient(135deg, var(--accent-fire), var(--accent-orange));
+  border: none; border-radius: 8px;
+  color: white; font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 15px; letter-spacing: 1px;
+  cursor: pointer; margin-top: 16px;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.save-btn:hover { opacity: 0.88; }
+.save-btn:active { transform: scale(0.98); }
+
+/* ===== STAT CARDS (Accueil) ===== */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex; align-items: center; gap: 14px;
+  transition: border-color 0.3s;
+}
+
+.stat-icon-box {
+  width: 46px; height: 46px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+
+.icon-fire { background: rgba(255,69,0,0.15); }
+.icon-alert { background: rgba(255,179,0,0.15); }
+.icon-relay { background: rgba(0,230,118,0.12); }
+.icon-sms { background: rgba(0,212,255,0.12); }
+
+.stat-value {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 28px; line-height: 1;
+  transition: color 0.4s;
+}
+
+.stat-label { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ===== RESET BTN ===== */
+.reset-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 16px;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 7px;
+  color: var(--accent-cyan);
+  font-family: 'Exo 2', sans-serif;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.reset-btn:hover { background: rgba(0,212,255,0.15); border-color: rgba(0,212,255,0.4); }
+
+/* ===== FIRE BTN ===== */
+.fire-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 16px;
+  background: rgba(255,69,0,0.1);
+  border: 1px solid rgba(255,69,0,0.3);
+  border-radius: 7px;
+  color: var(--accent-fire);
+  font-family: 'Exo 2', sans-serif;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.fire-btn:hover { background: rgba(255,69,0,0.2); border-color: rgba(255,69,0,0.6); }
+
+/* ===== SECTION HEADER ===== */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap; gap: 10px;
+}
+
+.section-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700; font-size: 16px; letter-spacing: 1px;
+}
+
+/* ===== LCD ===== */
+.lcd-wrapper {
+  background: #071407;
+  border: 2px solid #1a4a1a;
+  border-radius: 10px;
+  padding: 14px 20px;
+  font-family: 'Share Tech Mono', monospace;
+  color: #00ff41;
+  font-size: 14px;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 16px;
+  box-shadow: inset 0 0 20px rgba(0,255,65,0.04), 0 0 10px rgba(0,255,65,0.06);
+}
+
+.lcd-lines { flex: 1; }
+.lcd-label { opacity: 0.4; font-size: 9px; margin-bottom: 6px; letter-spacing: 3px; }
+.lcd-line { min-height: 20px; transition: all 0.3s; }
+
+/* ===== TOAST ===== */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 999;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 13px;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  transform: translateY(80px); opacity: 0;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex; align-items: center; gap: 10px;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.success { border-color: rgba(0,230,118,0.4); }
+.toast.danger  { border-color: rgba(255,23,68,0.4); }
+.toast.info    { border-color: rgba(0,212,255,0.3); }
+
+/* ===== OVERLAY MOBILE ===== */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1100px) {
+  .sensors-grid { grid-template-columns: 1fr 1fr; }
+  .bottom-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 850px) {
+  .sidebar {
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.open { display: block; }
+  .main { margin-left: 0; }
+  .hamburger { display: flex; }
+  .page { padding: 16px; }
+  .sensors-grid { grid-template-columns: 1fr; }
+  .relay-row { grid-template-columns: 1fr; }
+  .params-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .table-header, .table-row { grid-template-columns: 110px 1fr 80px 70px; }
+  .table-header > *:nth-child(4), .table-row > *:nth-child(4) { display: none; }
+}
+
+@media (max-width: 480px) {
+  .stats-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .topbar { padding: 0 14px; }
+  .topbar-right .time-display { display: none; }
+  .sensor-value { font-size: 38px; }
+  .table-header, .table-row { grid-template-columns: 100px 1fr 70px; }
+  .table-header > *:nth-child(5), .table-row > *:nth-child(5) { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🔥</div>
+    <div class="logo-name">SIDIRT</div>
+    <div class="logo-sub">Système Intelligent de Détection<br>d'Incendie en Temps Réel</div>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-section">Navigation</div>
+    <div class="nav-item active" onclick="showPage('accueil', this)">
+      <span class="nav-icon">🏠</span> Accueil
+    </div>
+    <div class="nav-item" onclick="showPage('capteurs', this)">
+      <span class="nav-icon">📡</span> Capteurs en Direct
+    </div>
+    <div class="nav-item" onclick="showPage('video', this)">
+      <span class="nav-icon">📹</span> Flux Vidéo
+    </div>
+    <div class="nav-section">Analyse</div>
+    <div class="nav-item" onclick="showPage('graphique', this)">
+      <span class="nav-icon">📊</span> Graphiques
+    </div>
+    <div class="nav-item" onclick="showPage('historique', this)">
+      <span class="nav-icon">📋</span> Historique
+    </div>
+    <div class="nav-section">Système</div>
+    <div class="nav-item" onclick="showPage('parametres', this)">
+      <span class="nav-icon">⚙️</span> Paramètres
+    </div>
+  </nav>
+
+  <div class="status-bar">
+    <div class="sys-status">
+      <div class="status-dot" id="esp32Dot"></div>
+      <span id="esp32Status">ESP32-S Connecté</span>
+    </div>
+    <div class="sys-status" style="margin-top:6px; font-size:10px; color:var(--text-muted);" id="camStatusBar">
+      🟡 ESP32-S3-CAM Veille
+    </div>
+    <div class="sys-status" style="margin-top:6px; font-size:10px; color:var(--text-muted);">
+      📶 GSM Opérationnel
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="hamburger" id="hamburger" onclick="toggleSidebar()">
+        <span></span><span></span><span></span>
+      </div>
+      <div>
+        <div class="page-title" id="pageTitle">Tableau de Bord</div>
+        <div class="page-breadcrumb">SIDIRT / <span id="pageBreadcrumb">Accueil</span></div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="time-display" id="clock">--:--:--</div>
+      <div class="alert-badge" onclick="showPage('historique', null)" title="Voir l'historique">
+        🔔 <span class="badge-count" id="alertCount">3</span>
+      </div>
+      <div class="user-chip">
+        <div class="user-avatar">AD</div>
+        <div class="user-name">Admin</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE ACCUEIL ===== -->
+  <div class="page active" id="page-accueil">
+    <div class="alert-banner" id="alertBanner" style="display:none;">
+      <div class="alert-icon">🚨</div>
+      <div class="alert-text">
+        <div class="alert-title">ALERTE — FLAMME DÉTECTÉE</div>
+        <div class="alert-sub">Capteur de flamme actif · Relais électricité coupé · Pompe activée · SMS envoyés</div>
+      </div>
+      <div class="alert-time" id="alertTime">00:00:00</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon-box icon-fire">🔥</div>
+        <div>
+          <div class="stat-value" style="color:var(--accent-fire)" id="statIncendies">0</div>
+          <div class="stat-label">Incendies aujourd'hui</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon-box icon-alert">⚠️</div>
+        <div>
+          <div class="stat-value" style="color:var(--warning)" id="statAlertes">0</div>
+          <div class="stat-label">Alertes actives</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon-box icon-relay">⚡</div>
+        <div>
+          <div class="stat-value" style="color:var(--safe)" id="statRelais">ACTIF</div>
+          <div class="stat-label">Alimentation électrique</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon-box icon-sms">📱</div>
+        <div>
+          <div class="stat-value" style="color:var(--accent-cyan)" id="statSms">0</div>
+          <div class="stat-label">SMS envoyés</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">📡 Capteurs en Temps Réel</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="fire-btn" onclick="simulateFire()">🔥 Simuler Incendie</button>
+        <button class="reset-btn" onclick="simulateNormal()">🔄 Retour Normal</button>
+      </div>
+    </div>
+    <div class="sensors-grid">
+      <div class="sensor-card safe" id="cardTemp">
+        <div class="sensor-icon">🌡️</div>
+        <div class="sensor-header">
+          <span class="sensor-name">Température</span>
+          <span class="sensor-badge badge-safe" id="badgeTemp">NORMAL</span>
+        </div>
+        <div class="sensor-value-row">
+          <span class="sensor-value" id="tempVal" style="color:var(--safe)">26</span>
+          <span class="sensor-unit">°C</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-safe" id="progressTemp" style="width:26%"></div></div>
+        <div class="sensor-threshold">
+          <span>Seuil alerte : 40°C</span>
+          <span id="tempStatus">✓ Normal</span>
+        </div>
+      </div>
+
+      <div class="sensor-card safe" id="cardGaz">
+        <div class="sensor-icon">💨</div>
+        <div class="sensor-header">
+          <span class="sensor-name">Gaz MQ-2</span>
+          <span class="sensor-badge badge-safe" id="badgeGaz">NORMAL</span>
+        </div>
+        <div class="sensor-value-row">
+          <span class="sensor-value" id="gazVal" style="color:var(--safe)">120</span>
+          <span class="sensor-unit">ppm</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-safe" id="progressGaz" style="width:12%"></div></div>
+        <div class="sensor-threshold">
+          <span>Seuil alerte : 300 ppm</span>
+          <span id="gazStatus">✓ Normal</span>
+        </div>
+      </div>
+
+      <div class="sensor-card safe" id="cardFlamme">
+        <div class="sensor-icon">🔥</div>
+        <div class="sensor-header">
+          <span class="sensor-name">Capteur de Flamme</span>
+          <span class="sensor-badge badge-safe" id="badgeFlamme">PAS DE FLAMME</span>
+        </div>
+        <div class="sensor-value-row">
+          <span class="sensor-value" id="flammeVal" style="color:var(--safe)">820</span>
+          <span class="sensor-unit">/ 1023</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-safe" id="progressFlamme" style="width:10%"></div></div>
+        <div class="sensor-threshold">
+          <span>Seuil activé : &lt; 300</span>
+          <span id="flammeStatus">✓ Aucune flamme</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header" style="margin-top:4px;">
+      <div class="section-title">⚡ État des Relais</div>
+    </div>
+    <div class="relay-row">
+      <div class="relay-card">
+        <div class="relay-indicator relay-on" id="relay1Icon">⚡</div>
+        <div class="relay-info">
+          <div class="relay-label">Relais 1 — Alimentation Électrique</div>
+          <div class="relay-state">État : <span class="state-on" id="relay1State">ACTIVE</span></div>
+        </div>
+        <button class="relay-toggle" onclick="toggleRelay(1)">Manuel</button>
+      </div>
+      <div class="relay-card">
+        <div class="relay-indicator relay-off" id="relay2Icon">💧</div>
+        <div class="relay-info">
+          <div class="relay-label">Relais 2 — Pompe à Eau</div>
+          <div class="relay-state">État : <span class="state-off" id="relay2State">ARRÊTÉE</span></div>
+        </div>
+        <button class="relay-toggle" onclick="toggleRelay(2)">Manuel</button>
+      </div>
+    </div>
+
+    <!-- LCD Display -->
+    <div class="lcd-wrapper">
+      <span style="font-size:22px;">📟</span>
+      <div class="lcd-lines">
+        <div class="lcd-label">LCD I2C 16×2</div>
+        <div class="lcd-line" id="lcdLine1">SYSTEME NORMAL  </div>
+        <div class="lcd-line" id="lcdLine2">TOUT VA BIEN :) </div>
+      </div>
+    </div>
+
+    <!-- Bottom: Video + SMS -->
+    <div class="bottom-grid">
+      <div class="video-card">
+        <div class="card-header">
+          <div class="card-title">📹 Flux ESP32-S3-CAM <span class="live-badge" id="liveBadge1" style="display:none;">LIVE</span></div>
+          <button class="reset-btn" onclick="showPage('video', document.querySelectorAll('.nav-item')[2])">Plein écran</button>
+        </div>
+        <div class="video-area">
+          <div class="video-placeholder" id="camPlaceholder1">
+            <div class="cam-icon">📹</div>
+            <div class="cam-label" id="camLabel1">Caméra en veille — En attente d'incendie</div>
+          </div>
+          <div class="video-overlay">
+            <div class="corner tl"></div><div class="corner tr"></div>
+            <div class="corner bl"></div><div class="corner br"></div>
+          </div>
+          <div class="video-info">
+            CAM-01 | 640×480<br>
+            <span id="videoTime">--:--:--</span> | SIDIRT v2.0
+          </div>
+          <div class="cam-status-badge" id="camBadge1">⏸ VEILLE</div>
+        </div>
+      </div>
+
+      <div class="sms-card">
+        <div class="card-header">
+          <div class="card-title">📱 Journal SMS GSM</div>
+          <span style="font-size:10px; color:var(--text-muted);" id="smsCount">0 envoyé(s)</span>
+        </div>
+        <div class="sms-list" id="smsList">
+          <div style="padding:24px; text-align:center; color:var(--text-muted); font-size:12px;">
+            ✓ Aucun SMS — Système normal
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE CAPTEURS ===== -->
+  <div class="page" id="page-capteurs">
+    <div class="section-header">
+      <div class="section-title">📡 Capteurs en Direct — Données Brutes</div>
+      <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-muted); background:var(--bg-card); padding:5px 12px; border-radius:6px; border:1px solid var(--border);">⟳ Rafraîchissement 2s</div>
+    </div>
+    <div class="sensors-grid">
+      <div class="sensor-card safe" id="cardTemp2">
+        <div class="sensor-icon">🌡️</div>
+        <div class="sensor-header">
+          <span class="sensor-name">Capteur Température (DS18B20)</span>
+          <span class="sensor-badge badge-safe" id="badgeTemp2">NORMAL</span>
+        </div>
+        <div class="sensor-value-row">
+          <span class="sensor-value" id="tempVal2" style="color:var(--safe)">26</span>
+          <span class="sensor-unit">°C</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-safe" id="progressTemp2" style="width:26%"></div></div>
+        <div class="sensor-threshold"><span>Seuil : 40°C</span><span>Pin : GPIO34</span></div>
+        <div style="margin-top:12px; font-size:10px; color:var(--text-muted);">
+          LCD : <span id="lcdMsgTemp" style="color:var(--safe)">SYSTEME NORMAL</span>
+        </div>
+      </div>
+      <div class="sensor-card safe" id="cardGaz2">
+        <div class="sensor-icon">💨</div>
+        <div class="sensor-header">
+          <span class="sensor-name">Capteur Gaz MQ-2</span>
+          <span class="sensor-badge badge-safe" id="badgeGaz2">NORMAL</span>
+        </div>
+        <div class="sensor-value-row">
+          <span class="sensor-value" id="gazVal2" style="color:var(--safe)">120</span>
+          <span class="sensor-unit">ppm</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-safe" id="progressGaz2" style="width:12%"></div></div>
+        <div class="sensor-threshold"><span>Seuil : 300 ppm</span><span>Pin : GPIO35</span></div>
+        <div style="margin-top:12px; font-size:10px; color:var(--text-muted);">
+          LCD : <span id="lcdMsgGaz" style="color:var(--safe)">SYSTEME NORMAL</span>
+        </div>
+      </div>
+      <div class="sensor-card safe" id="cardFlamme2">
+        <div class="sensor-icon">🔥</div>
+        <div class="sensor-header">
+          <span class="sensor-name">Capteur de Flamme (IR)</span>
+          <span class="sensor-badge badge-safe" id="badgeFlamme2">PAS DE FLAMME</span>
+        </div>
+        <div class="sensor-value-row">
+          <span class="sensor-value" id="flammeVal2" style="color:var(--safe)">820</span>
+          <span class="sensor-unit">/ 1023</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill fill-safe" id="progressFlamme2" style="width:10%"></div></div>
+        <div class="sensor-threshold"><span>Seuil : &lt; 300 → Flamme</span><span>Pin : GPIO32</span></div>
+        <div style="margin-top:12px; font-size:10px; color:var(--text-muted);">
+          Action : <span id="lcdMsgFlamme" style="color:var(--safe)">Aucune</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header" style="margin-top:8px;">
+      <div class="section-title">🔘 Bouton de Réarmement</div>
+    </div>
+    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <div style="font-size:40px;">🔘</div>
+      <div style="flex:1; min-width:200px;">
+        <div style="font-weight:700; font-size:15px;">Bouton Poussoir — GPIO27</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Réarme l'alimentation électrique après extinction de l'incendie. Appui physique requis.</div>
+      </div>
+      <button class="save-btn" style="width:auto; padding:10px 24px;" onclick="rearmement()">⚡ Simuler Réarmement</button>
+    </div>
+  </div>
+
+  <!-- ===== PAGE VIDEO ===== -->
+  <div class="page" id="page-video">
+    <div class="section-header">
+      <div class="section-title">📹 Flux Vidéo en Temps Réel</div>
+      <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-muted); background:var(--bg-card); padding:5px 12px; border-radius:6px; border:1px solid var(--border);">ESP32-S3-CAM | 640×480 | MJPEG</div>
+    </div>
+    <div class="video-card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <div class="card-title">📹 Transmission Directe — Caméra 01 <span class="live-badge" id="liveBadge2" style="display:none;">LIVE</span></div>
+        <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--accent-cyan);" id="videoTime2">--:--:--</div>
+      </div>
+      <div class="video-area" style="aspect-ratio:16/9; height:420px; max-height:60vw;">
+        <div class="video-placeholder" id="camPlaceholder2">
+          <div style="font-size:60px;">📹</div>
+          <div style="font-size:14px; letter-spacing:1px; margin-top:8px;" id="camLabel2">Caméra en veille — Mode économie d'énergie</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:8px;">sidirt.live/cam01</div>
+        </div>
+        <div class="video-overlay">
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+        </div>
+        <div class="video-info">
+          CAM-01 | 640×480 | 30fps<br>
+          <span id="videoTimeInner">--:--:--</span> | SIDIRT v2.0
+        </div>
+        <div class="cam-status-badge" id="camBadge2">⏸ VEILLE</div>
+      </div>
+    </div>
+    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px 20px; font-size:12px; color:var(--text-secondary);">
+      <strong style="color:var(--text-primary);">ℹ️ Comportement ESP32-S3-CAM :</strong>
+      En état normal, la caméra est en <strong>mode veille</strong> pour économiser l'énergie.
+      Elle s'active <strong>automatiquement</strong> dès que le capteur de flamme détecte un incendie (valeur &lt; 300).
+      Le flux vidéo est transmis via WiFi vers cette plateforme et le lien est inclus dans les SMS GSM envoyés aux autorités.
+    </div>
+  </div>
+
+  <!-- ===== PAGE GRAPHIQUE ===== -->
+  <div class="page" id="page-graphique">
+    <div class="section-header">
+      <div class="section-title">📊 Graphiques — Évolution des Données</div>
+      <div class="chart-filters">
+        <button class="filter-btn active" data-range="60">1H</button>
+        <button class="filter-btn" data-range="360">6H</button>
+        <button class="filter-btn" data-range="1440">24H</button>
+        <button class="filter-btn" data-range="10080">7J</button>
+      </div>
+    </div>
+
+    <div class="chart-wrapper">
+      <div class="chart-title">
+        Température (°C)
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-cyan)"></div>Temp. réelle</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--danger); opacity:0.5"></div>Seuil 40°C</div>
+        </div>
+      </div>
+      <canvas id="chartTemp" height="80"></canvas>
+    </div>
+
+    <div class="chart-wrapper">
+      <div class="chart-title">
+        Concentration Gaz MQ-2 (ppm)
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--warning)"></div>Gaz ppm</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--danger); opacity:0.5"></div>Seuil 300ppm</div>
+        </div>
+      </div>
+      <canvas id="chartGaz" height="80"></canvas>
+    </div>
+
+    <div class="chart-wrapper">
+      <div class="chart-title">
+        Capteur de Flamme (valeur brute — &lt;300 = Flamme)
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--accent-fire)"></div>Valeur IR</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--danger); opacity:0.5"></div>Seuil 300</div>
+        </div>
+      </div>
+      <canvas id="chartFlamme" height="80"></canvas>
+    </div>
+  </div>
+
+  <!-- ===== PAGE HISTORIQUE ===== -->
+  <div class="page" id="page-historique">
+    <div class="section-header">
+      <div class="section-title">📋 Historique des Événements</div>
+      <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-muted);" id="histDate">Aujourd'hui</div>
+    </div>
+    <div class="history-table">
+      <div class="table-header">
+        <div>Horodatage</div>
+        <div>Description</div>
+        <div>Type</div>
+        <div>Valeur</div>
+        <div>Statut</div>
+      </div>
+      <div id="historyRows">
+        <div style="padding:32px; text-align:center; color:var(--text-muted); font-size:12px;">
+          ✓ Aucun événement enregistré — Système normal
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE PARAMÈTRES ===== -->
+  <div class="page" id="page-parametres">
+    <div class="section-header">
+      <div class="section-title">⚙️ Paramètres du Système</div>
+    </div>
+    <div class="params-grid">
+      <div class="param-card">
+        <div class="param-card-title">🌡️ Seuils des Capteurs</div>
+        <div class="param-row">
+          <div><div class="param-label">Seuil Température</div><div class="param-desc">Déclenche alerte LCD</div></div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input class="param-input" type="number" value="40" id="seuilTemp"> <span style="font-size:11px; color:var(--text-muted);">°C</span>
+          </div>
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Seuil Gaz MQ-2</div><div class="param-desc">Déclenche alerte gaz</div></div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input class="param-input" type="number" value="300" id="seuilGaz"> <span style="font-size:11px; color:var(--text-muted);">ppm</span>
+          </div>
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Seuil Flamme</div><div class="param-desc">Active relais + caméra</div></div>
+          <input class="param-input" type="number" value="300" id="seuilFlamme">
+        </div>
+        <button class="save-btn" onclick="saveParams()">💾 Enregistrer les Seuils</button>
+      </div>
+
+      <div class="param-card">
+        <div class="param-card-title">📱 Notifications GSM</div>
+        <div class="param-row">
+          <div><div class="param-label">Propriétaire</div><div class="param-desc">Numéro principal</div></div>
+          <input class="param-input" type="tel" value="+241 XX XXX XXX" style="width:150px; font-size:11px;">
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Pompiers</div><div class="param-desc">Autorité locale</div></div>
+          <input class="param-input" type="tel" value="+241 XX XXX XXX" style="width:150px; font-size:11px;">
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Police / Sécurité</div><div class="param-desc">Autorité locale</div></div>
+          <input class="param-input" type="tel" value="+241 XX XXX XXX" style="width:150px; font-size:11px;">
+        </div>
+        <button class="save-btn" onclick="saveParams()">💾 Enregistrer Contacts</button>
+      </div>
+
+      <div class="param-card">
+        <div class="param-card-title">⚡ Options Système</div>
+        <div class="param-row">
+          <div><div class="param-label">Alertes SMS automatiques</div><div class="param-desc">Envoi auto lors d'incendie</div></div>
+          <div class="toggle-switch on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Caméra veille automatique</div><div class="param-desc">Économie d'énergie</div></div>
+          <div class="toggle-switch on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Coupure auto électricité</div><div class="param-desc">Sur détection de flamme</div></div>
+          <div class="toggle-switch on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Journalisation auto</div><div class="param-desc">Historique des événements</div></div>
+          <div class="toggle-switch on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+      </div>
+
+      <div class="param-card">
+        <div class="param-card-title">📶 Connexion ESP32</div>
+        <div class="param-row">
+          <div><div class="param-label">IP ESP32-S (Maître)</div><div class="param-desc">Microcontrôleur principal</div></div>
+          <input class="param-input" type="text" value="192.168.1.100" style="width:140px; font-size:11px;">
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">IP ESP32-S3-CAM</div><div class="param-desc">Esclave caméra</div></div>
+          <input class="param-input" type="text" value="192.168.1.101" style="width:140px; font-size:11px;">
+        </div>
+        <div class="param-row">
+          <div><div class="param-label">Port serveur</div><div class="param-desc">Port de communication</div></div>
+          <input class="param-input" type="number" value="8080">
+        </div>
+        <button class="save-btn" onclick="saveParams()">🔗 Reconnecter</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ============ STATE ============
+let fireState = false;
+let relay1On = true;
+let relay2On = false;
+let smsCount = 0;
+let fireCount = 0;
+let historyLog = [];
+let chartsBuilt = false;
+let chartTemp, chartGaz, chartFlamme;
+let currentSensors = { temp: 26, gaz: 120, flamme: 820 };
+
+// ============ TOAST ============
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  t.innerHTML = msg;
+  t.className = `toast ${type} show`;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.classList.remove('show'); }, 3500);
+}
+
+// ============ MOBILE SIDEBAR ============
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// ============ CLOCK ============
+function updateClock() {
+  const now = new Date();
+  const t = now.toLocaleTimeString('fr-FR');
+  document.getElementById('clock').textContent = t;
+  ['videoTime','videoTime2','videoTimeInner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t;
+  });
+  if (fireState) document.getElementById('alertTime').textContent = t;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============ ADD HISTORY EVENT ============
+function addHistoryEvent(desc, type, val, severity) {
+  const now = new Date();
+  historyLog.unshift({ time: now, desc, type, val, severity });
+  document.getElementById('alertCount').textContent = historyLog.filter(e => e.severity === 'danger').length;
+  renderHistory();
+}
+
+// ============ RENDER HISTORY ============
+function renderHistory() {
+  const rows = document.getElementById('historyRows');
+  if (historyLog.length === 0) {
+    rows.innerHTML = '<div style="padding:32px; text-align:center; color:var(--text-muted); font-size:12px;">✓ Aucun événement enregistré</div>';
+    return;
+  }
+  const typeColors = { flamme:'evt-flamme', gaz:'evt-gaz', temp:'evt-temp', sms:'evt-sms', systeme:'evt-systeme' };
+  const sevColors = { danger:'var(--danger)', warning:'var(--warning)', safe:'var(--safe)' };
+  document.getElementById('histDate').textContent = historyLog[0].time.toLocaleDateString('fr-FR');
+
+  rows.innerHTML = historyLog.map(e => `
+    <div class="table-row">
+      <div style="font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-muted);">${e.time.toLocaleDateString('fr-FR')}<br>${e.time.toLocaleTimeString('fr-FR')}</div>
+      <div style="font-size:12px;"><span class="severity-dot" style="background:${sevColors[e.severity]}; box-shadow:0 0 6px ${sevColors[e.severity]}"></span>${e.desc}</div>
+      <div><span class="event-type ${typeColors[e.type]}">${e.type.toUpperCase()}</span></div>
+      <div style="font-family:'Share Tech Mono',monospace; font-size:11px;">${e.val}</div>
+      <div style="font-size:10px; color:${sevColors[e.severity]}; font-weight:700;">${e.severity==='safe'?'✓ OK':e.severity==='warning'?'⚠ ALERTE':'✕ URGENCE'}</div>
+    </div>`).join('');
+}
+
+// ============ SIMULATE FIRE ============
+function simulateFire() {
+  if (fireState) return;
+  fireState = true;
+  fireCount++;
+  relay1On = false;
+  relay2On = true;
+
+  document.getElementById('alertBanner').style.display = 'flex';
+  document.getElementById('statIncendies').textContent = fireCount;
+  document.getElementById('statAlertes').textContent = '3';
+  document.getElementById('statRelais').textContent = 'COUPÉ';
+  document.getElementById('statRelais').style.color = 'var(--danger)';
+
+  // Relays
+  setRelayUI(1, false, 'COUPÉ (Incendie)');
+  setRelayUI(2, true, 'ACTIVE (Extinction)');
+
+  // Camera
+  setCameraActive(true);
+
+  // Status bar
+  document.getElementById('camStatusBar').innerHTML = '🔴 ESP32-S3-CAM ACTIVE';
+  document.getElementById('camStatusBar').style.color = 'var(--danger)';
+
+  // ESP32 dot warning
+  document.getElementById('esp32Dot').className = 'status-dot danger';
+
+  // SMS
+  sendSMS();
+
+  // History
+  addHistoryEvent("Flamme détectée — Capteur IR activé", "flamme", "<300", "danger");
+  setTimeout(() => addHistoryEvent("Relais 1 (électricité) désactivé auto", "systeme", "OFF", "danger"), 200);
+  setTimeout(() => addHistoryEvent("Relais 2 (pompe) activé automatiquement", "systeme", "ON", "warning"), 400);
+  setTimeout(() => addHistoryEvent("ESP32-S3-CAM réveillée — flux démarré", "systeme", "ACTIF", "warning"), 600);
+
+  showToast('🚨 INCENDIE DÉTECTÉ — Relais activés, SMS envoyés', 'danger');
+}
+
+// ============ SIMULATE NORMAL ============
+function simulateNormal() {
+  if (!fireState && fireCount === 0) { showToast('ℹ️ Système déjà en état normal', 'info'); return; }
+  fireState = false;
+  relay1On = true; relay2On = false;
+
+  document.getElementById('alertBanner').style.display = 'none';
+  document.getElementById('statAlertes').textContent = '0';
+  document.getElementById('statRelais').textContent = 'ACTIF';
+  document.getElementById('statRelais').style.color = 'var(--safe)';
+
+  setRelayUI(1, true, 'ACTIVE');
+  setRelayUI(2, false, 'ARRÊTÉE');
+  setCameraActive(false);
+
+  document.getElementById('camStatusBar').innerHTML = '🟡 ESP32-S3-CAM Veille';
+  document.getElementById('camStatusBar').style.color = '';
+  document.getElementById('esp32Dot').className = 'status-dot';
+
+  updateSensors(randomBetween(22, 36), randomBetween(80, 180), randomBetween(700, 950));
+  showToast('✅ Retour à l\'état normal', 'success');
+  addHistoryEvent("Retour à l'état normal — Système réinitialisé", "systeme", "OK", "safe");
+}
+
+function setRelayUI(n, on, label) {
+  document.getElementById(`relay${n}Icon`).className = `relay-indicator relay-${on?'on':'off'}`;
+  document.getElementById(`relay${n}State`).textContent = label;
+  document.getElementById(`relay${n}State`).className = on ? 'state-on' : 'state-off';
+}
+
+function setCameraActive(active) {
+  ['1','2'].forEach(n => {
+    const badge = document.getElementById(`camBadge${n}`);
+    const label = document.getElementById(`camLabel${n}`);
+    const live = document.getElementById(`liveBadge${n}`);
+    if (active) {
+      badge.textContent = '🔴 LIVE'; badge.className = 'cam-status-badge active-cam';
+      if (label) label.innerHTML = '⚡ ESP32-S3-CAM activée<br><span style="font-size:10px; color:var(--accent-fire); margin-top:4px; display:block;">Flux en direct — sidirt.live/cam01</span>';
+      if (live) live.style.display = 'inline';
+    } else {
+      badge.textContent = '⏸ VEILLE'; badge.className = 'cam-status-badge';
+      if (label) label.textContent = 'Caméra en veille — Mode économie d\'énergie';
+      if (live) live.style.display = 'none';
+    }
+  });
+}
+
+// ============ SMS ============
+function sendSMS() {
+  const now = new Date();
+  const msgs = [
+    { avatar: 'AUT', cls: 'auth', recipient: '🚒 Pompiers Locaux', text: 'SIDIRT ALERTE: Incendie détecté. Lien vidéo: sidirt.live/cam01', delay: 0 },
+    { avatar: 'POL', cls: 'auth', recipient: '👮 Autorités locales', text: 'SIDIRT URGENCE: Flamme active. Adresse: Site Industriel A. Lien: sidirt.live/cam01', delay: 800 },
+    { avatar: 'PRO', cls: 'owner', recipient: '👤 Propriétaire', text: 'Alerte SIDIRT: INCENDIE sur votre site. Électricité coupée. Pompe activée. Vidéo: sidirt.live/cam01', delay: 1600 },
+  ];
+
+  const list = document.getElementById('smsList');
+  list.innerHTML = '';
+
+  msgs.forEach((m, i) => {
+    setTimeout(() => {
+      smsCount++;
+      document.getElementById('statSms').textContent = smsCount;
+      document.getElementById('smsCount').textContent = `${smsCount} envoyé(s)`;
+      const t = new Date(now.getTime() + m.delay);
+      list.innerHTML += `
+        <div class="sms-item" style="animation: fadeIn 0.3s ease;">
+          <div class="sms-avatar ${m.cls}">${m.avatar}</div>
+          <div class="sms-content">
+            <div class="sms-recipient">${m.recipient}</div>
+            <div class="sms-text">${m.text}</div>
+            <div class="sms-time">${t.toLocaleTimeString('fr-FR')}</div>
+          </div>
+          <span class="sms-status sms-sent">Envoyé</span>
+        </div>`;
+      addHistoryEvent(`SMS envoyé → ${m.recipient.replace(/[🚒👮👤] /,'')}`, "sms", "ENVOYÉ", "safe");
+    }, m.delay);
+  });
+}
+
+// ============ REARMEMENT ============
+function rearmement() {
+  if (!fireState) { showToast('ℹ️ Pas d\'incendie actif à réarmer', 'info'); return; }
+  simulateNormal();
+  showToast('⚡ Réarmement effectué — Alimentation électrique rétablie', 'success');
+}
+
+// ============ TOGGLE RELAY ============
+function toggleRelay(n) {
+  if (n === 1) {
+    relay1On = !relay1On;
+    setRelayUI(1, relay1On, relay1On ? 'ACTIVE (Manuel)' : 'COUPÉ (Manuel)');
+    showToast(`⚡ Relais 1 ${relay1On ? 'activé' : 'coupé'} manuellement`, relay1On ? 'success' : 'info');
+  } else {
+    relay2On = !relay2On;
+    setRelayUI(2, relay2On, relay2On ? 'ACTIVE (Manuel)' : 'ARRÊTÉE (Manuel)');
+    showToast(`💧 Pompe ${relay2On ? 'activée' : 'arrêtée'} manuellement`, relay2On ? 'success' : 'info');
+  }
+}
+
+// ============ SAVE PARAMS ============
+function saveParams() {
+  showToast('✅ Paramètres enregistrés avec succès', 'success');
+}
+
+// ============ SENSOR UPDATE ============
+function randomBetween(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+
+function updateSensors(temp, gaz, flamme) {
+  currentSensors = { temp, gaz, flamme };
+  const tempAlert = temp >= 40;
+  const gazAlert  = gaz  >= 300;
+  const flammeAlert = flamme < 300;
+
+  // --- ACCUEIL page ---
+  updateSensorCard('cardTemp', 'tempVal', 'badgeTemp', 'progressTemp', 'tempStatus',
+    temp, tempAlert ? 'danger' : 'safe',
+    tempAlert ? 'ALERTE' : 'NORMAL',
+    tempAlert ? 'badge-danger' : 'badge-safe',
+    tempAlert ? 'fill-danger' : 'fill-safe',
+    tempAlert ? `var(--danger)` : `var(--safe)`,
+    Math.min(temp, 100),
+    tempAlert ? `⬆ +${temp-40}°C au-dessus` : '✓ Normal');
+
+  updateSensorCard('cardGaz', 'gazVal', 'badgeGaz', 'progressGaz', 'gazStatus',
+    gaz, gazAlert ? 'warning' : 'safe',
+    gazAlert ? 'ALERTE GAZ' : 'NORMAL',
+    gazAlert ? 'badge-warning' : 'badge-safe',
+    gazAlert ? 'fill-warning' : 'fill-safe',
+    gazAlert ? `var(--warning)` : `var(--safe)`,
+    Math.min(gaz / 10, 100),
+    gazAlert ? `⬆ +${gaz-300} au-dessus` : '✓ Normal');
+
+  const flammeProgress = flammeAlert ? Math.max(5, Math.floor((1 - flamme/1023)*100)+20) : Math.floor(flamme/1023*10);
+  updateSensorCard('cardFlamme', 'flammeVal', 'badgeFlamme', 'progressFlamme', 'flammeStatus',
+    flamme, flammeAlert ? 'danger' : 'safe',
+    flammeAlert ? 'FLAMME!' : 'PAS DE FLAMME',
+    flammeAlert ? 'badge-danger' : 'badge-safe',
+    flammeAlert ? 'fill-danger' : 'fill-safe',
+    flammeAlert ? `var(--accent-fire)` : `var(--safe)`,
+    Math.min(flammeProgress, 100),
+    flammeAlert ? '🔥 FLAMME DÉTECTÉE' : '✓ Aucune flamme');
+
+  // --- CAPTEURS page ---
+  updateSensorCard('cardTemp2', 'tempVal2', 'badgeTemp2', 'progressTemp2', null,
+    temp, tempAlert ? 'danger' : 'safe',
+    tempAlert ? 'ALERTE' : 'NORMAL',
+    tempAlert ? 'badge-danger' : 'badge-safe',
+    tempAlert ? 'fill-danger' : 'fill-safe',
+    tempAlert ? `var(--danger)` : `var(--safe)`,
+    Math.min(temp, 100), null);
+
+  updateSensorCard('cardGaz2', 'gazVal2', 'badgeGaz2', 'progressGaz2', null,
+    gaz, gazAlert ? 'warning' : 'safe',
+    gazAlert ? 'ALERTE GAZ' : 'NORMAL',
+    gazAlert ? 'badge-warning' : 'badge-safe',
+    gazAlert ? 'fill-warning' : 'fill-safe',
+    gazAlert ? `var(--warning)` : `var(--safe)`,
+    Math.min(gaz/10, 100), null);
+
+  updateSensorCard('cardFlamme2', 'flammeVal2', 'badgeFlamme2', 'progressFlamme2', null,
+    flamme, flammeAlert ? 'danger' : 'safe',
+    flammeAlert ? 'FLAMME!' : 'PAS DE FLAMME',
+    flammeAlert ? 'badge-danger' : 'badge-safe',
+    flammeAlert ? 'fill-danger' : 'fill-safe',
+    flammeAlert ? `var(--accent-fire)` : `var(--safe)`,
+    Math.min(flammeProgress, 100), null);
+
+  // LCD messages on capteurs page
+  const el = document.getElementById('lcdMsgTemp');
+  if (el) { el.textContent = tempAlert ? 'ALERTE TEMPERATURE' : 'SYSTEME NORMAL'; el.style.color = tempAlert ? 'var(--danger)' : 'var(--safe)'; }
+  const el2 = document.getElementById('lcdMsgGaz');
+  if (el2) { el2.textContent = gazAlert ? 'ALERTE GAZ' : 'SYSTEME NORMAL'; el2.style.color = gazAlert ? 'var(--warning)' : 'var(--safe)'; }
+  const el3 = document.getElementById('lcdMsgFlamme');
+  if (el3) { el3.textContent = flammeAlert ? 'Relais 1 OFF · Relais 2 ON · CAM ON' : 'Aucune'; el3.style.color = flammeAlert ? 'var(--accent-fire)' : 'var(--safe)'; }
+
+  updateLCD(tempAlert, gazAlert, flammeAlert);
+}
+
+function updateSensorCard(cardId, valId, badgeId, progId, statusId, val, cardClass, badgeText, badgeClass, fillClass, valColor, progWidth, statusText) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.className = `sensor-card ${cardClass}`;
+  const valEl = document.getElementById(valId);
+  if (valEl) { valEl.textContent = val; valEl.style.color = valColor; }
+  const badge = document.getElementById(badgeId);
+  if (badge) { badge.textContent = badgeText; badge.className = `sensor-badge ${badgeClass}`; }
+  const prog = document.getElementById(progId);
+  if (prog) { prog.className = `progress-fill ${fillClass}`; prog.style.width = progWidth + '%'; }
+  if (statusId) {
+    const stat = document.getElementById(statusId);
+    if (stat) stat.textContent = statusText;
+  }
+}
+
+function updateLCD(temp, gaz, flamme) {
+  const l1 = document.getElementById('lcdLine1');
+  const l2 = document.getElementById('lcdLine2');
+  if (!l1 || !l2) return;
+  if (flamme) {
+    if (temp && gaz) { l1.textContent = "RISQUE EXPLOSION"; l2.textContent = "FLAMME DETECTEE!!"; }
+    else { l1.textContent = "FLAMME DETECTEE!"; l2.textContent = "POMPE ACTIVEE..."; }
+    l1.style.color = '#ff4500'; l2.style.color = '#ff4500';
+  } else if (temp && gaz) {
+    l1.textContent = "RISQUE EXPLOSION"; l2.textContent = "TEMP+GAZ CRITIQ!";
+    l1.style.color = '#ffb300'; l2.style.color = '#ffb300';
+  } else if (temp) {
+    l1.textContent = "ALERTE TEMP     "; l2.textContent = "VERIFICEZ SITE!!";
+    l1.style.color = '#00d4ff'; l2.style.color = '#00d4ff';
+  } else if (gaz) {
+    l1.textContent = "ALERTE GAZ MQ-2 "; l2.textContent = "VERIFICEZ SITE!!";
+    l1.style.color = '#ffb300'; l2.style.color = '#ffb300';
+  } else {
+    l1.textContent = "SYSTEME NORMAL  "; l2.textContent = "TOUT VA BIEN :) ";
+    l1.style.color = '#00ff41'; l2.style.color = '#00ff41';
+  }
+}
+
+// ============ SENSOR SIMULATION ============
+setInterval(() => {
+  if (fireState) {
+    updateSensors(randomBetween(58, 72), randomBetween(380, 460), randomBetween(140, 240));
+  } else {
+    updateSensors(randomBetween(22, 36), randomBetween(80, 180), randomBetween(700, 950));
+  }
+}, 2000);
+
+// ============ PAGE NAVIGATION ============
+const pageTitles = {
+  accueil:    ['Tableau de Bord', 'Accueil'],
+  capteurs:   ['Capteurs en Direct', 'Capteurs'],
+  video:      ['Flux Vidéo', 'Vidéo'],
+  graphique:  ['Graphiques', 'Graphiques'],
+  historique: ['Historique', 'Historique'],
+  parametres: ['Paramètres', 'Paramètres'],
+};
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('pageTitle').textContent = pageTitles[name][0];
+  document.getElementById('pageBreadcrumb').textContent = pageTitles[name][1];
+  if (name === 'graphique') setTimeout(buildCharts, 100);
+  closeSidebar();
+}
+
+// ============ CHARTS ============
+function buildCharts() {
+  if (chartsBuilt) return;
+  chartsBuilt = true;
+
+  const labels = [];
+  const now = new Date();
+  for (let i = 59; i >= 0; i--) {
+    const t = new Date(now.getTime() - i * 60000);
+    labels.push(t.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+  }
+
+  const tempData = labels.map((_, i) => {
+    if (i > 50) return randomBetween(58, 72);
+    if (i > 45) return 40 + (i - 45) * 4;
+    return randomBetween(22, 36);
+  });
+
+  const gazData = labels.map((_, i) => {
+    if (i > 48) return randomBetween(380, 460);
+    if (i > 43) return 200 + (i - 43) * 30;
+    return randomBetween(80, 180);
+  });
+
+  const flammeData = labels.map((_, i) => {
+    if (i > 52) return randomBetween(140, 240);
+    return randomBetween(700, 1000);
+  });
+
+  const opts = () => ({
+    responsive: true,
+    animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0d1420',
+        borderColor: '#1a2e45',
+        borderWidth: 1,
+        titleColor: '#e8f0fe',
+        bodyColor: '#7a9cc0',
+        padding: 10,
+      }
+    },
+    scales: {
+      x: {
+        ticks: { color: '#3a5a7a', font: { family: 'Share Tech Mono', size: 9 }, maxTicksLimit: 8 },
+        grid: { color: 'rgba(255,255,255,0.03)' }
+      },
+      y: {
+        ticks: { color: '#3a5a7a', font: { family: 'Share Tech Mono', size: 10 } },
+        grid: { color: 'rgba(255,255,255,0.04)' }
+      }
+    }
+  });
+
+  chartTemp = new Chart(document.getElementById('chartTemp'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { data: tempData, borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.06)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4 },
+      { data: Array(60).fill(40), borderColor: 'rgba(255,23,68,0.4)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false }
+    ]},
+    options: opts()
+  });
+
+  chartGaz = new Chart(document.getElementById('chartGaz'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { data: gazData, borderColor: '#ffb300', backgroundColor: 'rgba(255,179,0,0.06)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4 },
+      { data: Array(60).fill(300), borderColor: 'rgba(255,23,68,0.4)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false }
+    ]},
+    options: opts()
+  });
+
+  chartFlamme = new Chart(document.getElementById('chartFlamme'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { data: flammeData, borderColor: '#ff4500', backgroundColor: 'rgba(255,69,0,0.08)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4 },
+      { data: Array(60).fill(300), borderColor: 'rgba(255,23,68,0.4)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false }
+    ]},
+    options: opts()
+  });
+}
+
+// Filter buttons
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    showToast(`📊 Plage modifiée : ${this.textContent}`, 'info');
+  });
+});
+
+// ============ INIT ============
+updateSensors(26, 120, 820);
+addHistoryEvent("SIDIRT démarré — ESP32-S connecté", "systeme", "OK", "safe");
+
+// CSS animation for new SMS items
+const style = document.createElement('style');
+style.textContent = '@keyframes fadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }';
+document.head.appendChild(style);
+</script>
+</body>
+</html>
