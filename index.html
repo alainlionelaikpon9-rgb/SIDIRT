@@ -1127,7 +1127,7 @@ canvas { width: 100% !important; }
       <div class="video-card">
         <div class="card-header">
           <div class="card-title">📹 Flux ESP32-S3-CAM <span class="live-badge" id="liveBadge1" style="display:none;">LIVE</span></div>
-          <button class="reset-btn" onclick="showPage('video', document.querySelectorAll('.nav-item')[2])">Plein écran</button>
+          <button class="reset-btn" onclick="ouvrirCamera()">🎥 Ouvrir Caméra</button>
         </div>
         <div class="video-area">
           <div class="video-placeholder" id="camPlaceholder1">
@@ -1989,21 +1989,27 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
   });
 });
 
-// ============ VIDEO NGROK ============
+// ============ OUVRIR CAMERA ============
+function ouvrirCamera() {
+  const url = document.getElementById('ngrokUrl') ? document.getElementById('ngrokUrl').value : 'https://squad-agility-cut.ngrok-free.dev';
+  const camUrl = url && url.trim() !== '' ? url.trim() : 'https://squad-agility-cut.ngrok-free.dev';
+  window.open(camUrl, '_blank');
+  showToast('📹 Caméra ouverte dans un nouvel onglet', 'success');
+  setCameraActive(true);
+}
 function updateVideoSrc(url) {
-  if (!url || url.trim() === '') return;
+  if (!url || url.trim() === '') { showToast('⚠️ Entrez une URL ngrok', 'info'); return; }
   url = url.trim();
   if (!url.startsWith('http')) url = 'https://' + url;
-  const wrapper = document.getElementById('videoIframeWrapper');
-  const iframe  = document.getElementById('videoIframe');
-  if (wrapper && iframe) {
-    iframe.src = url;
-    wrapper.style.display = 'block';
-    showToast('📹 Flux vidéo connecté : ' + url, 'success');
-    // Update camera badge
-    setCameraActive(true);
-    document.getElementById('camLabel2').innerHTML = `⚡ Flux en direct depuis ngrok<br><span style="font-size:10px; color:var(--accent-cyan);">${url}</span>`;
-  }
+  // Ouvrir dans un nouvel onglet (MJPEG ne fonctionne pas en iframe)
+  window.open(url, '_blank');
+  showToast('📹 Flux vidéo ouvert dans un nouvel onglet', 'success');
+  setCameraActive(true);
+  // Mettre à jour le placeholder
+  const label2 = document.getElementById('camLabel2');
+  if (label2) label2.innerHTML = `🔴 Flux actif dans un autre onglet<br><span style="font-size:10px; color:var(--accent-cyan); margin-top:4px; display:block;">${url}</span>`;
+  const label1 = document.getElementById('camLabel1');
+  if (label1) label1.innerHTML = `🔴 Flux actif dans un autre onglet`;
 }
 
 // ============ INIT ============
