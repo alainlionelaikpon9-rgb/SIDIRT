@@ -507,7 +507,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
   <div class="page" id="page-capteurs">
     <div class="section-header">
       <div class="section-title">📡 Capteurs en Direct — Données Brutes</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-muted);background:var(--bg-card);padding:5px 12px;border-radius:6px;border:1px solid var(--border);">⟳ 2s</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent-cyan);background:var(--bg-card);padding:5px 12px;border-radius:6px;border:1px solid var(--border);" id="lastUpdate">⟳ En attente...</div>
     </div>
     <div class="sensors-grid">
       <div class="sensor-card safe" id="cardTemp2">
@@ -688,9 +688,9 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="params-grid">
       <div class="param-card">
         <div class="param-card-title">🌡️ Seuils des Capteurs</div>
-        <div class="param-row"><div><div class="param-label">Seuil Température</div><div class="param-desc">Déclenche alerte LCD</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="32" id="seuilTemp"><span style="font-size:10px;color:var(--text-muted);">°C</span></div></div>
-        <div class="param-row"><div><div class="param-label">Seuil Gaz MQ-2</div><div class="param-desc">Déclenche alerte gaz</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="400" id="seuilGaz"><span style="font-size:10px;color:var(--text-muted);">ppm</span></div></div>
-        <div class="param-row"><div><div class="param-label">Seuil Flamme</div><div class="param-desc">Active relais + caméra (valeur ≤ seuil)</div></div><input class="param-input" type="number" value="3000" id="seuilFlamme"></div>
+        <div class="param-row"><div><div class="param-label">Seuil Température</div><div class="param-desc">Déclenche alerte LCD</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="40" id="seuilTemp"><span style="font-size:10px;color:var(--text-muted);">°C</span></div></div>
+        <div class="param-row"><div><div class="param-label">Seuil Gaz MQ-2</div><div class="param-desc">Déclenche alerte gaz</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="300" id="seuilGaz"><span style="font-size:10px;color:var(--text-muted);">ppm</span></div></div>
+        <div class="param-row"><div><div class="param-label">Seuil Flamme</div><div class="param-desc">Active relais + caméra + IA</div></div><input class="param-input" type="number" value="300" id="seuilFlamme"></div>
         <button class="save-btn" onclick="saveParams()">💾 Enregistrer</button>
       </div>
       <div class="param-card">
@@ -900,7 +900,7 @@ function simulateFire(){
   document.getElementById('esp32Dot').className='status-dot danger';
   setTimeout(()=>updateAI(true),1000);
   sendSMS();
-  addHistoryEvent('Flamme détectée — Capteur IR activé','flamme','<300','danger');
+  addHistoryEvent('Flamme détectée — Capteur IR activé (val≤'+SEUIL_FLAMME_JS+')','flamme',currentSensors.flamme,'danger');
   setTimeout(()=>addHistoryEvent('Relais 1 désactivé automatiquement','systeme','OFF','danger'),300);
   setTimeout(()=>addHistoryEvent('Relais 2 (pompe) activé','systeme','ON','warning'),600);
   setTimeout(()=>addHistoryEvent('ESP32-S3-CAM réveillée — flux démarré','systeme','ACTIF','warning'),900);
@@ -983,51 +983,48 @@ function saveParams(){showToast('✅ Paramètres enregistrés','success');}
 // ============ SENSORS ============
 function randomBetween(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 
-// Seuils identiques à l'Arduino
-const SEUIL_FLAMME_JS = 3000;
-const SEUIL_GAZ_JS    = 400;
-const SEUIL_TEMP_JS   = 32.0;
-
 function updateSensors(temp, gaz, flamme){
-  currentSensors = {temp, gaz, flamme};
+  currentSensors={temp, gaz, flamme};
   const tA = temp   >= SEUIL_TEMP_JS;
   const gA = gaz    >= SEUIL_GAZ_JS;
-  const fA = flamme <= SEUIL_FLAMME_JS; // flamme détectée quand valeur BASSE (IR)
+  const fA = flamme <= SEUIL_FLAMME_JS;
 
   const pTemp   = Math.min((temp / 50) * 100, 100);
   const pGaz    = Math.min((gaz / 1000) * 100, 100);
-  const pFlamme = Math.min(((4095 - flamme) / 4095) * 100, 100); // inversé
+  const pFlamme = Math.min(((4095 - flamme) / 4095) * 100, 100); // inversé : bas = danger
 
   updateCard('cardTemp','tempVal','badgeTemp','progressTemp','tempStatus',
-    temp.toFixed(1), tA?'danger':'safe', tA?'ALERTE':'NORMAL',
-    tA?'badge-danger':'badge-safe', tA?'fill-danger':'fill-safe',
-    tA?'var(--danger)':'var(--safe)', pTemp,
-    tA ? '⬆ +'+(temp-SEUIL_TEMP_JS).toFixed(1)+'°C' : '✓ Normal');
+    temp.toFixed(1),tA?'danger':'safe',tA?'ALERTE':'NORMAL',
+    tA?'badge-danger':'badge-safe',tA?'fill-danger':'fill-safe',
+    tA?'var(--danger)':'var(--safe)',pTemp,
+    tA?'⬆ +'+(temp-SEUIL_TEMP_JS).toFixed(1)+'°C':'✓ Normal');
 
   updateCard('cardGaz','gazVal','badgeGaz','progressGaz','gazStatus',
-    gaz, gA?'warning':'safe', gA?'ALERTE GAZ':'NORMAL',
-    gA?'badge-warning':'badge-safe', gA?'fill-warning':'fill-safe',
-    gA?'var(--warning)':'var(--safe)', pGaz,
-    gA ? '⬆ +'+(gaz-SEUIL_GAZ_JS)+' ppm' : '✓ Normal');
+    gaz,gA?'warning':'safe',gA?'ALERTE GAZ':'NORMAL',
+    gA?'badge-warning':'badge-safe',gA?'fill-warning':'fill-safe',
+    gA?'var(--warning)':'var(--safe)',pGaz,
+    gA?'⬆ +'+(gaz-SEUIL_GAZ_JS)+' ppm':'✓ Normal');
 
   updateCard('cardFlamme','flammeVal','badgeFlamme','progressFlamme','flammeStatus',
-    flamme, fA?'danger':'safe', fA?'FLAMME!':'PAS DE FLAMME',
-    fA?'badge-danger':'badge-safe', fA?'fill-danger':'fill-safe',
-    fA?'var(--accent-fire)':'var(--safe)', pFlamme,
-    fA ? '🔥 FLAMME DÉTECTÉE' : '✓ Aucune flamme');
+    flamme,fA?'danger':'safe',fA?'FLAMME!':'PAS DE FLAMME',
+    fA?'badge-danger':'badge-safe',fA?'fill-danger':'fill-safe',
+    fA?'var(--accent-fire)':'var(--safe)',pFlamme,
+    fA?'🔥 FLAMME DÉTECTÉE':'✓ Aucune flamme');
 
   updateCard('cardTemp2','tempVal2','badgeTemp2','progressTemp2',null,
-    temp.toFixed(1), tA?'danger':'safe', tA?'ALERTE':'NORMAL',
-    tA?'badge-danger':'badge-safe', tA?'fill-danger':'fill-safe',
-    tA?'var(--danger)':'var(--safe)', pTemp, null);
+    temp.toFixed(1),tA?'danger':'safe',tA?'ALERTE':'NORMAL',
+    tA?'badge-danger':'badge-safe',tA?'fill-danger':'fill-safe',
+    tA?'var(--danger)':'var(--safe)',pTemp,null);
+
   updateCard('cardGaz2','gazVal2','badgeGaz2','progressGaz2',null,
-    gaz, gA?'warning':'safe', gA?'ALERTE GAZ':'NORMAL',
-    gA?'badge-warning':'badge-safe', gA?'fill-warning':'fill-safe',
-    gA?'var(--warning)':'var(--safe)', pGaz, null);
+    gaz,gA?'warning':'safe',gA?'ALERTE GAZ':'NORMAL',
+    gA?'badge-warning':'badge-safe',gA?'fill-warning':'fill-safe',
+    gA?'var(--warning)':'var(--safe)',pGaz,null);
+
   updateCard('cardFlamme2','flammeVal2','badgeFlamme2','progressFlamme2',null,
-    flamme, fA?'danger':'safe', fA?'FLAMME!':'PAS DE FLAMME',
-    fA?'badge-danger':'badge-safe', fA?'fill-danger':'fill-safe',
-    fA?'var(--accent-fire)':'var(--safe)', pFlamme, null);
+    flamme,fA?'danger':'safe',fA?'FLAMME!':'PAS DE FLAMME',
+    fA?'badge-danger':'badge-safe',fA?'fill-danger':'fill-safe',
+    fA?'var(--accent-fire)':'var(--safe)',pFlamme,null);
 
   updateLCD(tA, gA, fA);
 }
@@ -1045,15 +1042,12 @@ function updateLCD(t, g, f){
   const l1=document.getElementById('lcdLine1'), l2=document.getElementById('lcdLine2');
   if(!l1||!l2) return;
   const cs = currentSensors;
-  // Ligne 2 : T:XXC G:XXX F:XXXX  (identique à l'Arduino)
-  const tStr = cs.temp < 10 ? ' '+Math.round(cs.temp) : Math.round(cs.temp);
-  const gStr = cs.gaz < 100 ? (cs.gaz < 10 ? '  '+cs.gaz : ' '+cs.gaz) : cs.gaz;
-  l2.textContent = 'T:'+tStr+'C G:'+gStr+' F:'+cs.flamme;
-  l2.style.color = '#00ff41';
-  // Ligne 1 : messages identiques à l'Arduino
-  if(systemeVerrouille || f){
-    if(systemeVerrouille){ l1.textContent='BLOCAGE INCENDIE'; l1.style.color='#ff4500'; }
-    else                 { l1.textContent='>>> INCENDIE !!! '; l1.style.color='#ff4500'; }
+
+  // Ligne 1 — messages identiques à l'Arduino
+  if(fireState){
+    l1.textContent='BLOCAGE INCENDIE'; l1.style.color='#ff4500';
+  } else if(f){
+    l1.textContent='>>> INCENDIE !!! '; l1.style.color='#ff4500';
   } else if(g && t){
     l1.textContent='RISQUE EXPLOSION'; l1.style.color='#ffb300';
   } else if(g){
@@ -1063,38 +1057,122 @@ function updateLCD(t, g, f){
   } else {
     l1.textContent='SYSTEME OK      '; l1.style.color='#00ff41';
   }
+
+  // Ligne 2 — T:XXC G:XXX F:XXXX (identique à l'Arduino)
+  const tStr = cs.temp < 10 ? ' '+Math.round(cs.temp) : ''+Math.round(cs.temp);
+  const gStr = cs.gaz  < 100 ? (cs.gaz < 10 ? '  '+cs.gaz : ' '+cs.gaz) : ''+cs.gaz;
+  l2.textContent = 'T:'+tStr+'C G:'+gStr+' F:'+cs.flamme;
+  l2.style.color = '#00ff41';
 }
 
 // ============ SUPABASE ============
 const SUPABASE_URL='https://dufnwjzrvbtkjtvfialj.supabase.co';
 const SUPABASE_KEY='sb_publishable_9-yUYWHtc__pvypx3uBXHw_65i2sYS7';
-let supabaseConnected=false,lastFetchFailed=false;
+let supabaseConnected=false, lastFetchFailed=false;
+
+// Seuils identiques à l'Arduino
+const SEUIL_TEMP_JS   = 32.0;
+const SEUIL_GAZ_JS    = 400;
+const SEUIL_FLAMME_JS = 3000;
+
+// Historique pour les graphiques en temps réel
+const chartLabels  = [];
+const chartTempD   = [];
+const chartGazD    = [];
+const chartFlammeD = [];
+let chartTempObj=null, chartGazObj=null, chartFlammeObj=null;
 
 async function fetchSupabase(){
   try{
-    const res=await fetch(`${SUPABASE_URL}/rest/v1/capteurs?select=*&order=created_at.desc&limit=1`,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}});
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const res=await fetch(
+      `${SUPABASE_URL}/rest/v1/capteurs?select=*&order=created_at.desc&limit=1`,
+      {headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}}
+    );
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
-    if(data&&data.length>0){
-      const d=data[0];
-      // Valeurs exactes de l'Arduino — flamme est un entier 0-4095
+    if(data && data.length>0){
+      const d = data[0];
+      // ✅ Valeurs réelles de l'Arduino
       const temp   = parseFloat(d.temperature) || 0;
       const gaz    = parseInt(d.gaz)           || 0;
       const flamme = parseInt(d.flamme)        || 4095;
+
+      // Mettre à jour les capteurs immédiatement
       updateSensors(temp, gaz, flamme);
-      if(d.verrouille && !fireState) simulateFire();
-      else if(!d.verrouille && fireState) simulateNormal();
-      if(!supabaseConnected||lastFetchFailed){supabaseConnected=true;lastFetchFailed=false;document.getElementById('esp32Dot').className='status-dot';document.getElementById('esp32Status').textContent='ESP32-S Connecté ✓';}
+
+      // Mettre à jour les stats en direct
+      updateStats(temp, gaz, flamme, d.verrouille);
+
+      // Historique graphique — ajouter point toutes les 2s
+      const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      chartLabels.push(now);
+      chartTempD.push(temp);
+      chartGazD.push(gaz);
+      chartFlammeD.push(flamme);
+      // Garder seulement les 60 derniers points
+      if(chartLabels.length>60){ chartLabels.shift(); chartTempD.shift(); chartGazD.shift(); chartFlammeD.shift(); }
+      // Mettre à jour les graphiques si ouverts
+      updateChartLive();
+
+      // Logique incendie basée sur vraies valeurs
+      const incendie = (flamme <= SEUIL_FLAMME_JS) || d.verrouille;
+      if(incendie && !fireState) simulateFire();
+      else if(!incendie && fireState) simulateNormal();
+
+      if(!supabaseConnected||lastFetchFailed){
+        supabaseConnected=true; lastFetchFailed=false;
+        document.getElementById('esp32Dot').className='status-dot';
+        document.getElementById('esp32Status').textContent='ESP32-S Connecté ✓';
+      }
     }
   }catch(err){
     lastFetchFailed=true;
-    if(fireState) updateSensors(randomBetween(33,38), randomBetween(420,500), randomBetween(800,2000));
-    else             updateSensors(randomBetween(24,30), randomBetween(80,250),  randomBetween(3200,4095));
     document.getElementById('esp32Dot').className='status-dot warning';
     document.getElementById('esp32Status').textContent='En attente ESP32...';
   }
 }
-fetchSupabase();setInterval(fetchSupabase,2000);
+
+// Mise à jour stats en direct
+function updateStats(temp, gaz, flamme, verrouille){
+  const tA = temp   >= SEUIL_TEMP_JS;
+  const gA = gaz    >= SEUIL_GAZ_JS;
+  const fA = flamme <= SEUIL_FLAMME_JS;
+  const alertes = (tA?1:0)+(gA?1:0)+(fA?1:0);
+  document.getElementById('statAlertes').textContent = alertes;
+  // Alimentation
+  const r1 = document.getElementById('statRelais');
+  if(verrouille || fA){
+    r1.textContent='COUPÉ'; r1.style.color='var(--danger)';
+  } else {
+    r1.textContent='ACTIF'; r1.style.color='var(--safe)';
+  }
+  // Indicateur dernière MAJ
+  const ts = new Date().toLocaleTimeString('fr-FR');
+  const el = document.getElementById('lastUpdate');
+  if(el) el.textContent = '⟳ ' + ts;
+}
+
+// Mise à jour graphiques en live
+function updateChartLive(){
+  if(chartTempObj){
+    chartTempObj.data.labels = [...chartLabels];
+    chartTempObj.data.datasets[0].data = [...chartTempD];
+    chartTempObj.update('none');
+  }
+  if(chartGazObj){
+    chartGazObj.data.labels = [...chartLabels];
+    chartGazObj.data.datasets[0].data = [...chartGazD];
+    chartGazObj.update('none');
+  }
+  if(chartFlammeObj){
+    chartFlammeObj.data.labels = [...chartLabels];
+    chartFlammeObj.data.datasets[0].data = [...chartFlammeD];
+    chartFlammeObj.update('none');
+  }
+}
+
+fetchSupabase();
+setInterval(fetchSupabase, 2000); // toutes les 2 secondes comme l'Arduino
 
 // ============ VIDEO ============
 function updateVideoSrc(url){
@@ -1119,24 +1197,50 @@ function showPage(name,el){
   closeSidebar();
 }
 
-// ============ CHARTS ============
+// ============ CHARTS (temps réel) ============
 function buildCharts(){
-  if(chartsBuilt)return;chartsBuilt=true;
-  const labels=[],now=new Date();
-  for(let i=59;i>=0;i--){const t=new Date(now.getTime()-i*60000);labels.push(t.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}));}
-  const tempData=labels.map((_,i)=>i>50?randomBetween(58,72):i>45?40+(i-45)*4:randomBetween(22,36));
-  const gazData=labels.map((_,i)=>i>48?randomBetween(380,460):i>43?200+(i-43)*30:randomBetween(80,180));
-  const flammeData=labels.map((_,i)=>i>52?randomBetween(140,240):randomBetween(700,1000));
-  const opts=()=>({responsive:true,animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1420',borderColor:'#1a2e45',borderWidth:1,titleColor:'#e8f0fe',bodyColor:'#7a9cc0',padding:10}},scales:{x:{ticks:{color:'#3a5a7a',font:{family:'Share Tech Mono',size:9},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{color:'#3a5a7a',font:{family:'Share Tech Mono',size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}});
-  new Chart(document.getElementById('chartTemp'),{type:'line',data:{labels,datasets:[{data:tempData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(32),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
-  new Chart(document.getElementById('chartGaz'),{type:'line',data:{labels,datasets:[{data:gazData,borderColor:'#ffb300',backgroundColor:'rgba(255,179,0,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(400),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
-  new Chart(document.getElementById('chartFlamme'),{type:'line',data:{labels,datasets:[{data:flammeData,borderColor:'#ff4500',backgroundColor:'rgba(255,69,0,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(3000),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
+  if(chartsBuilt) return; chartsBuilt=true;
+  const opts=()=>({
+    responsive:true, animation:false,
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1420',borderColor:'#1a2e45',borderWidth:1,titleColor:'#e8f0fe',bodyColor:'#7a9cc0',padding:10}},
+    scales:{
+      x:{ticks:{color:'#3a5a7a',font:{family:'Share Tech Mono',size:9},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.03)'}},
+      y:{ticks:{color:'#3a5a7a',font:{family:'Share Tech Mono',size:10}},grid:{color:'rgba(255,255,255,0.04)'}}
+    }
+  });
+  // Données initiales = historique accumulé depuis le démarrage
+  const initLabels  = chartLabels.length  ? [...chartLabels]  : ['--:--'];
+  const initTemp    = chartTempD.length   ? [...chartTempD]   : [0];
+  const initGaz     = chartGazD.length    ? [...chartGazD]    : [0];
+  const initFlamme  = chartFlammeD.length ? [...chartFlammeD] : [4095];
+
+  chartTempObj = new Chart(document.getElementById('chartTemp'),{
+    type:'line',
+    data:{labels:initLabels,datasets:[
+      {data:initTemp,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},
+      {data:Array(initLabels.length).fill(SEUIL_TEMP_JS),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}
+    ]},options:opts()
+  });
+  chartGazObj = new Chart(document.getElementById('chartGaz'),{
+    type:'line',
+    data:{labels:initLabels,datasets:[
+      {data:initGaz,borderColor:'#ffb300',backgroundColor:'rgba(255,179,0,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},
+      {data:Array(initLabels.length).fill(SEUIL_GAZ_JS),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}
+    ]},options:opts()
+  });
+  chartFlammeObj = new Chart(document.getElementById('chartFlamme'),{
+    type:'line',
+    data:{labels:initLabels,datasets:[
+      {data:initFlamme,borderColor:'#ff4500',backgroundColor:'rgba(255,69,0,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},
+      {data:Array(initLabels.length).fill(SEUIL_FLAMME_JS),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}
+    ]},options:opts()
+  });
 }
 
 document.querySelectorAll('.filter-btn').forEach(btn=>{btn.addEventListener('click',function(){document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');showToast(`📊 Plage : ${this.textContent}`,'info');});});
 
 // ============ INIT ============
-updateSensors(26, 120, 3800); // valeurs initiales normales (flamme haute = pas de feu)
+// Valeurs initiales neutres — Supabase prendra le relais dans 2s
 updateAI(false);
 addHistoryEvent('SIDIRT démarré — Système opérationnel','systeme','OK','safe');
 </script>
