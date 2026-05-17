@@ -1258,11 +1258,36 @@ canvas { width: 100% !important; }
         <div class="cam-status-badge" id="camBadge2">⏸ VEILLE</div>
       </div>
     </div>
+    <!-- NGROK URL INPUT -->
+    <div style="background:var(--bg-card); border:1px solid rgba(0,212,255,0.3); border-radius:12px; padding:18px 20px; margin-bottom:16px;">
+      <div style="font-family:'Rajdhani',sans-serif; font-weight:700; font-size:16px; color:var(--accent-cyan); margin-bottom:12px;">📡 Connecter le Flux Vidéo (ngrok)</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input id="ngrokUrl" type="text"
+          placeholder="https://squad-agility-cut.ngrok-free.dev"
+          style="flex:1; min-width:200px; background:var(--bg-dark); border:1px solid var(--accent-cyan);
+          border-radius:7px; color:var(--text-primary); font-family:'Share Tech Mono',monospace;
+          font-size:12px; padding:10px 14px; outline:none;">
+        <button onclick="updateVideoSrc(document.getElementById('ngrokUrl').value)"
+          style="padding:10px 22px; background:linear-gradient(135deg,var(--accent-fire),var(--accent-orange));
+          border:none; border-radius:7px; color:white; font-family:'Rajdhani',sans-serif;
+          font-weight:700; font-size:15px; cursor:pointer; white-space:nowrap;">
+          ▶ Connecter
+        </button>
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:8px;">
+        Collez ici l'URL ngrok affichée dans le cmd de votre PC (Forwarding https://xxxx.ngrok-free.dev)
+      </div>
+    </div>
+
+    <!-- VIDEO IFRAME -->
+    <div id="videoIframeWrapper" style="display:none; background:#000; border-radius:12px; overflow:hidden; margin-bottom:16px;">
+      <iframe id="videoIframe" src="" style="width:100%; height:480px; border:none;" allowfullscreen></iframe>
+    </div>
+
     <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px 20px; font-size:12px; color:var(--text-secondary);">
-      <strong style="color:var(--text-primary);">ℹ️ Comportement ESP32-S3-CAM :</strong>
-      En état normal, la caméra est en <strong>mode veille</strong> pour économiser l'énergie.
-      Elle s'active <strong>automatiquement</strong> dès que le capteur de flamme détecte un incendie (valeur &lt; 300).
-      Le flux vidéo est transmis via WiFi vers cette plateforme et le lien est inclus dans les SMS GSM envoyés aux autorités.
+      <strong style="color:var(--text-primary);">ℹ️ Votre URL ngrok active :</strong><br>
+      <span style="color:var(--accent-cyan); font-family:'Share Tech Mono',monospace;">https://squad-agility-cut.ngrok-free.dev</span><br><br>
+      Copiez-la dans le champ ci-dessus et cliquez <strong>Connecter</strong> pour voir le flux vidéo en direct.
     </div>
   </div>
 
