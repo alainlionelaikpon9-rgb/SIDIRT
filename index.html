@@ -723,14 +723,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-// ============ AUTH ============
-const USERS_KEY = 'sidirt_users';
-const SESSION_KEY = 'sidirt_session';
-
-function getUsers() { try { return JSON.parse(localStorage.getItem(USERS_KEY)||'[]'); } catch(e){return[];} }
-function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
-function getSession() { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null'); } catch(e){return null;} }
-function saveSession(u) { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); }
+// ============ AUTH — Supabase Auth ============
+// Utilise le même SUPABASE_URL et SUPABASE_KEY définis plus bas
+// On les pré-déclare ici pour l'auth, ils seront réassignés après
+const SB_URL = 'https://dufnwjzrvbtkjtvfialj.supabase.co';
+const SB_KEY = 'sb_publishable_9-yUYWHtc__pvypx3uBXHw_65i2sYS7';
+const TOKEN_KEY = 'sidirt_access_token';
+const REFRESH_KEY = 'sidirt_refresh_token';
 
 function switchTab(t) {
   document.getElementById('formLogin').style.display = t==='login'?'block':'none';
@@ -751,23 +750,36 @@ function togglePassword(id, btn) {
   else { inp.type = 'password'; btn.textContent = '👁'; }
 }
 
-function doLogin() {
+function setLoginLoading(on) {
+  const btns = document.querySelectorAll('.login-btn');
+  btns.forEach(b => { b.disabled = on; b.style.opacity = on ? '0.6' : '1'; });
+}
+
+async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const pass  = document.getElementById('loginPassword').value;
   if (!email || !pass) { showError('Veuillez remplir tous les champs.'); return; }
-  // Admin par défaut
-  if (email === 'admin@sidirt.com' && pass === 'admin123') {
-    saveSession({name:'Admin', email, role:'admin'});
-    enterApp('Admin');return;
-  }
-  const users = getUsers();
-  const user = users.find(u => u.email===email && u.password===pass);
-  if (!user) { showError('Email ou mot de passe incorrect.'); return; }
-  saveSession(user);
-  enterApp(user.name);
+  setLoginLoading(true);
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error_description || data.msg || 'Identifiants incorrects.');
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    localStorage.setItem(REFRESH_KEY, data.refresh_token || '');
+    const name = data.user?.user_metadata?.full_name || data.user?.email || 'Utilisateur';
+    enterApp(name, data.user?.email || '');
+  } catch(err) {
+    let msg = err.message || 'Identifiants incorrects.';
+    if (msg.includes('Invalid login') || msg.includes('invalid_grant')) msg = 'Email ou mot de passe incorrect.';
+    showError(msg);
+  } finally { setLoginLoading(false); }
 }
 
-function doRegister() {
+async function doRegister() {
   const name  = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const pass  = document.getElementById('regPassword').value;
@@ -775,33 +787,81 @@ function doRegister() {
   if (!name||!email||!pass||!pass2) { showError('Veuillez remplir tous les champs.'); return; }
   if (pass !== pass2) { showError('Les mots de passe ne correspondent pas.'); return; }
   if (pass.length < 6) { showError('Mot de passe trop court (min. 6 caractères).'); return; }
-  const users = getUsers();
-  if (users.find(u=>u.email===email)) { showError('Cet email est déjà utilisé.'); return; }
-  users.push({name, email, password:pass, role:'user'});
-  saveUsers(users);
-  saveSession({name, email, role:'user'});
-  enterApp(name);
+  setLoginLoading(true);
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass, data: { full_name: name } })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error_description || data.msg || 'Erreur inscription.');
+    if (data.access_token) {
+      // Confirmation email désactivée → connexion directe
+      localStorage.setItem(TOKEN_KEY, data.access_token);
+      localStorage.setItem(REFRESH_KEY, data.refresh_token || '');
+      enterApp(name, email);
+    } else {
+      // Confirmation email requise
+      showError('');
+      const el = document.getElementById('loginError');
+      el.style.display = 'block';
+      el.style.background = 'rgba(0,230,118,0.1)';
+      el.style.borderColor = 'rgba(0,230,118,0.3)';
+      el.style.color = 'var(--safe)';
+      el.textContent = '✅ Compte créé ! Vérifiez votre email puis connectez-vous.';
+      setTimeout(() => switchTab('login'), 3000);
+    }
+  } catch(err) {
+    let msg = err.message || 'Erreur lors de l\'inscription.';
+    if (msg.includes('already registered') || msg.includes('already exists')) msg = 'Cet email est déjà utilisé. Connectez-vous.';
+    showError(msg);
+  } finally { setLoginLoading(false); }
 }
 
-function enterApp(name) {
+function enterApp(name, email) {
   document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('userName').textContent = name;
-  document.getElementById('userAvatar').textContent = name.substring(0,2).toUpperCase();
-  showToast(`✅ Bienvenue, ${name} !`, 'success');
-  addHistoryEvent(`Connexion — ${name}`, 'systeme', 'OK', 'safe');
+  const display = name || email || 'Utilisateur';
+  document.getElementById('userName').textContent = display;
+  document.getElementById('userAvatar').textContent = display.substring(0,2).toUpperCase();
+  showToast(`✅ Bienvenue, ${display} !`, 'success');
+  addHistoryEvent(`Connexion — ${display}`, 'systeme', 'OK', 'safe');
 }
 
-function doLogout() {
-  sessionStorage.removeItem(SESSION_KEY);
+async function doLogout() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    try {
+      await fetch(`${SB_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${token}` }
+      });
+    } catch(e) {}
+  }
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_KEY);
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('loginEmail').value = '';
   document.getElementById('loginPassword').value = '';
+  switchTab('login');
 }
 
-// Auto-login si session active
-window.addEventListener('load', () => {
-  const s = getSession();
-  if (s) enterApp(s.name);
+// Auto-login si token valide
+window.addEventListener('load', async () => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return;
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/user`, {
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const user = await res.json();
+      const name = user?.user_metadata?.full_name || user?.email || 'Utilisateur';
+      enterApp(name, user?.email || '');
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  } catch(e) { localStorage.removeItem(TOKEN_KEY); }
 });
 
 // ============ STATE ============
@@ -1030,9 +1090,12 @@ async function fetchSupabase(){
     const data=await res.json();
     if(data&&data.length>0){
       const d=data[0];
-      updateSensors(parseFloat(d.temperature)||0,parseInt(d.gaz)||0,d.flamme?150:850);
-      if(d.verrouille&&!fireState)simulateFire();
-      else if(!d.verrouille&&fireState)simulateNormal();
+      const temp  = parseFloat(d.temperature) || 0;
+      const gaz   = parseInt(d.gaz)           || 0;
+      const flamme = parseInt(d.flamme)        || 1023; // valeur analogique réelle 0-1023
+      updateSensors(temp, gaz, flamme);
+      if(d.verrouille && !fireState) simulateFire();
+      else if(!d.verrouille && fireState) simulateNormal();
       if(!supabaseConnected||lastFetchFailed){supabaseConnected=true;lastFetchFailed=false;document.getElementById('esp32Dot').className='status-dot';document.getElementById('esp32Status').textContent='ESP32-S Connecté ✓';}
     }
   }catch(err){
