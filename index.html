@@ -688,9 +688,9 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
     <div class="params-grid">
       <div class="param-card">
         <div class="param-card-title">🌡️ Seuils des Capteurs</div>
-        <div class="param-row"><div><div class="param-label">Seuil Température</div><div class="param-desc">Déclenche alerte LCD</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="40" id="seuilTemp"><span style="font-size:10px;color:var(--text-muted);">°C</span></div></div>
-        <div class="param-row"><div><div class="param-label">Seuil Gaz MQ-2</div><div class="param-desc">Déclenche alerte gaz</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="300" id="seuilGaz"><span style="font-size:10px;color:var(--text-muted);">ppm</span></div></div>
-        <div class="param-row"><div><div class="param-label">Seuil Flamme</div><div class="param-desc">Active relais + caméra + IA</div></div><input class="param-input" type="number" value="300" id="seuilFlamme"></div>
+        <div class="param-row"><div><div class="param-label">Seuil Température</div><div class="param-desc">Déclenche alerte LCD</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="32" id="seuilTemp"><span style="font-size:10px;color:var(--text-muted);">°C</span></div></div>
+        <div class="param-row"><div><div class="param-label">Seuil Gaz MQ-2</div><div class="param-desc">Déclenche alerte gaz</div></div><div style="display:flex;align-items:center;gap:6px;"><input class="param-input" type="number" value="400" id="seuilGaz"><span style="font-size:10px;color:var(--text-muted);">ppm</span></div></div>
+        <div class="param-row"><div><div class="param-label">Seuil Flamme</div><div class="param-desc">Active relais + caméra (valeur ≤ seuil)</div></div><input class="param-input" type="number" value="3000" id="seuilFlamme"></div>
         <button class="save-btn" onclick="saveParams()">💾 Enregistrer</button>
       </div>
       <div class="param-card">
@@ -723,13 +723,14 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
-// ============ AUTH — Supabase Auth ============
-// Utilise le même SUPABASE_URL et SUPABASE_KEY définis plus bas
-// On les pré-déclare ici pour l'auth, ils seront réassignés après
-const SB_URL = 'https://dufnwjzrvbtkjtvfialj.supabase.co';
-const SB_KEY = 'sb_publishable_9-yUYWHtc__pvypx3uBXHw_65i2sYS7';
-const TOKEN_KEY = 'sidirt_access_token';
-const REFRESH_KEY = 'sidirt_refresh_token';
+// ============ AUTH ============
+const USERS_KEY = 'sidirt_users';
+const SESSION_KEY = 'sidirt_session';
+
+function getUsers() { try { return JSON.parse(localStorage.getItem(USERS_KEY)||'[]'); } catch(e){return[];} }
+function saveUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+function getSession() { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null'); } catch(e){return null;} }
+function saveSession(u) { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); }
 
 function switchTab(t) {
   document.getElementById('formLogin').style.display = t==='login'?'block':'none';
@@ -750,36 +751,23 @@ function togglePassword(id, btn) {
   else { inp.type = 'password'; btn.textContent = '👁'; }
 }
 
-function setLoginLoading(on) {
-  const btns = document.querySelectorAll('.login-btn');
-  btns.forEach(b => { b.disabled = on; b.style.opacity = on ? '0.6' : '1'; });
-}
-
-async function doLogin() {
+function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const pass  = document.getElementById('loginPassword').value;
   if (!email || !pass) { showError('Veuillez remplir tous les champs.'); return; }
-  setLoginLoading(true);
-  try {
-    const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: pass })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error_description || data.msg || 'Identifiants incorrects.');
-    localStorage.setItem(TOKEN_KEY, data.access_token);
-    localStorage.setItem(REFRESH_KEY, data.refresh_token || '');
-    const name = data.user?.user_metadata?.full_name || data.user?.email || 'Utilisateur';
-    enterApp(name, data.user?.email || '');
-  } catch(err) {
-    let msg = err.message || 'Identifiants incorrects.';
-    if (msg.includes('Invalid login') || msg.includes('invalid_grant')) msg = 'Email ou mot de passe incorrect.';
-    showError(msg);
-  } finally { setLoginLoading(false); }
+  // Admin par défaut
+  if (email === 'admin@sidirt.com' && pass === 'admin123') {
+    saveSession({name:'Admin', email, role:'admin'});
+    enterApp('Admin');return;
+  }
+  const users = getUsers();
+  const user = users.find(u => u.email===email && u.password===pass);
+  if (!user) { showError('Email ou mot de passe incorrect.'); return; }
+  saveSession(user);
+  enterApp(user.name);
 }
 
-async function doRegister() {
+function doRegister() {
   const name  = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const pass  = document.getElementById('regPassword').value;
@@ -787,81 +775,33 @@ async function doRegister() {
   if (!name||!email||!pass||!pass2) { showError('Veuillez remplir tous les champs.'); return; }
   if (pass !== pass2) { showError('Les mots de passe ne correspondent pas.'); return; }
   if (pass.length < 6) { showError('Mot de passe trop court (min. 6 caractères).'); return; }
-  setLoginLoading(true);
-  try {
-    const res = await fetch(`${SB_URL}/auth/v1/signup`, {
-      method: 'POST',
-      headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: pass, data: { full_name: name } })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error_description || data.msg || 'Erreur inscription.');
-    if (data.access_token) {
-      // Confirmation email désactivée → connexion directe
-      localStorage.setItem(TOKEN_KEY, data.access_token);
-      localStorage.setItem(REFRESH_KEY, data.refresh_token || '');
-      enterApp(name, email);
-    } else {
-      // Confirmation email requise
-      showError('');
-      const el = document.getElementById('loginError');
-      el.style.display = 'block';
-      el.style.background = 'rgba(0,230,118,0.1)';
-      el.style.borderColor = 'rgba(0,230,118,0.3)';
-      el.style.color = 'var(--safe)';
-      el.textContent = '✅ Compte créé ! Vérifiez votre email puis connectez-vous.';
-      setTimeout(() => switchTab('login'), 3000);
-    }
-  } catch(err) {
-    let msg = err.message || 'Erreur lors de l\'inscription.';
-    if (msg.includes('already registered') || msg.includes('already exists')) msg = 'Cet email est déjà utilisé. Connectez-vous.';
-    showError(msg);
-  } finally { setLoginLoading(false); }
+  const users = getUsers();
+  if (users.find(u=>u.email===email)) { showError('Cet email est déjà utilisé.'); return; }
+  users.push({name, email, password:pass, role:'user'});
+  saveUsers(users);
+  saveSession({name, email, role:'user'});
+  enterApp(name);
 }
 
-function enterApp(name, email) {
+function enterApp(name) {
   document.getElementById('loginPage').style.display = 'none';
-  const display = name || email || 'Utilisateur';
-  document.getElementById('userName').textContent = display;
-  document.getElementById('userAvatar').textContent = display.substring(0,2).toUpperCase();
-  showToast(`✅ Bienvenue, ${display} !`, 'success');
-  addHistoryEvent(`Connexion — ${display}`, 'systeme', 'OK', 'safe');
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userAvatar').textContent = name.substring(0,2).toUpperCase();
+  showToast(`✅ Bienvenue, ${name} !`, 'success');
+  addHistoryEvent(`Connexion — ${name}`, 'systeme', 'OK', 'safe');
 }
 
-async function doLogout() {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    try {
-      await fetch(`${SB_URL}/auth/v1/logout`, {
-        method: 'POST',
-        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${token}` }
-      });
-    } catch(e) {}
-  }
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+function doLogout() {
+  sessionStorage.removeItem(SESSION_KEY);
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('loginEmail').value = '';
   document.getElementById('loginPassword').value = '';
-  switchTab('login');
 }
 
-// Auto-login si token valide
-window.addEventListener('load', async () => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) return;
-  try {
-    const res = await fetch(`${SB_URL}/auth/v1/user`, {
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${token}` }
-    });
-    if (res.ok) {
-      const user = await res.json();
-      const name = user?.user_metadata?.full_name || user?.email || 'Utilisateur';
-      enterApp(name, user?.email || '');
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-  } catch(e) { localStorage.removeItem(TOKEN_KEY); }
+// Auto-login si session active
+window.addEventListener('load', () => {
+  const s = getSession();
+  if (s) enterApp(s.name);
 });
 
 // ============ STATE ============
@@ -1043,17 +983,53 @@ function saveParams(){showToast('✅ Paramètres enregistrés','success');}
 // ============ SENSORS ============
 function randomBetween(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 
-function updateSensors(temp,gaz,flamme){
-  currentSensors={temp,gaz,flamme};
-  const tA=temp>=40,gA=gaz>=300,fA=flamme<300;
-  updateCard('cardTemp','tempVal','badgeTemp','progressTemp','tempStatus',temp,tA?'danger':'safe',tA?'ALERTE':'NORMAL',tA?'badge-danger':'badge-safe',tA?'fill-danger':'fill-safe',tA?'var(--danger)':'var(--safe)',Math.min(temp,100),tA?`⬆ +${temp-40}°C`:'✓ Normal');
-  updateCard('cardGaz','gazVal','badgeGaz','progressGaz','gazStatus',gaz,gA?'warning':'safe',gA?'ALERTE GAZ':'NORMAL',gA?'badge-warning':'badge-safe',gA?'fill-warning':'fill-safe',gA?'var(--warning)':'var(--safe)',Math.min(gaz/10,100),gA?`⬆ +${gaz-300}`:'✓ Normal');
-  const fp=fA?Math.max(5,Math.floor((1-flamme/1023)*100)+20):Math.floor(flamme/1023*10);
-  updateCard('cardFlamme','flammeVal','badgeFlamme','progressFlamme','flammeStatus',flamme,fA?'danger':'safe',fA?'FLAMME!':'PAS DE FLAMME',fA?'badge-danger':'badge-safe',fA?'fill-danger':'fill-safe',fA?'var(--accent-fire)':'var(--safe)',Math.min(fp,100),fA?'🔥 FLAMME DÉTECTÉE':'✓ Aucune flamme');
-  updateCard('cardTemp2','tempVal2','badgeTemp2','progressTemp2',null,temp,tA?'danger':'safe',tA?'ALERTE':'NORMAL',tA?'badge-danger':'badge-safe',tA?'fill-danger':'fill-safe',tA?'var(--danger)':'var(--safe)',Math.min(temp,100),null);
-  updateCard('cardGaz2','gazVal2','badgeGaz2','progressGaz2',null,gaz,gA?'warning':'safe',gA?'ALERTE GAZ':'NORMAL',gA?'badge-warning':'badge-safe',gA?'fill-warning':'fill-safe',gA?'var(--warning)':'var(--safe)',Math.min(gaz/10,100),null);
-  updateCard('cardFlamme2','flammeVal2','badgeFlamme2','progressFlamme2',null,flamme,fA?'danger':'safe',fA?'FLAMME!':'PAS DE FLAMME',fA?'badge-danger':'badge-safe',fA?'fill-danger':'fill-safe',fA?'var(--accent-fire)':'var(--safe)',Math.min(fp,100),null);
-  updateLCD(tA,gA,fA);
+// Seuils identiques à l'Arduino
+const SEUIL_FLAMME_JS = 3000;
+const SEUIL_GAZ_JS    = 400;
+const SEUIL_TEMP_JS   = 32.0;
+
+function updateSensors(temp, gaz, flamme){
+  currentSensors = {temp, gaz, flamme};
+  const tA = temp   >= SEUIL_TEMP_JS;
+  const gA = gaz    >= SEUIL_GAZ_JS;
+  const fA = flamme <= SEUIL_FLAMME_JS; // flamme détectée quand valeur BASSE (IR)
+
+  const pTemp   = Math.min((temp / 50) * 100, 100);
+  const pGaz    = Math.min((gaz / 1000) * 100, 100);
+  const pFlamme = Math.min(((4095 - flamme) / 4095) * 100, 100); // inversé
+
+  updateCard('cardTemp','tempVal','badgeTemp','progressTemp','tempStatus',
+    temp.toFixed(1), tA?'danger':'safe', tA?'ALERTE':'NORMAL',
+    tA?'badge-danger':'badge-safe', tA?'fill-danger':'fill-safe',
+    tA?'var(--danger)':'var(--safe)', pTemp,
+    tA ? '⬆ +'+(temp-SEUIL_TEMP_JS).toFixed(1)+'°C' : '✓ Normal');
+
+  updateCard('cardGaz','gazVal','badgeGaz','progressGaz','gazStatus',
+    gaz, gA?'warning':'safe', gA?'ALERTE GAZ':'NORMAL',
+    gA?'badge-warning':'badge-safe', gA?'fill-warning':'fill-safe',
+    gA?'var(--warning)':'var(--safe)', pGaz,
+    gA ? '⬆ +'+(gaz-SEUIL_GAZ_JS)+' ppm' : '✓ Normal');
+
+  updateCard('cardFlamme','flammeVal','badgeFlamme','progressFlamme','flammeStatus',
+    flamme, fA?'danger':'safe', fA?'FLAMME!':'PAS DE FLAMME',
+    fA?'badge-danger':'badge-safe', fA?'fill-danger':'fill-safe',
+    fA?'var(--accent-fire)':'var(--safe)', pFlamme,
+    fA ? '🔥 FLAMME DÉTECTÉE' : '✓ Aucune flamme');
+
+  updateCard('cardTemp2','tempVal2','badgeTemp2','progressTemp2',null,
+    temp.toFixed(1), tA?'danger':'safe', tA?'ALERTE':'NORMAL',
+    tA?'badge-danger':'badge-safe', tA?'fill-danger':'fill-safe',
+    tA?'var(--danger)':'var(--safe)', pTemp, null);
+  updateCard('cardGaz2','gazVal2','badgeGaz2','progressGaz2',null,
+    gaz, gA?'warning':'safe', gA?'ALERTE GAZ':'NORMAL',
+    gA?'badge-warning':'badge-safe', gA?'fill-warning':'fill-safe',
+    gA?'var(--warning)':'var(--safe)', pGaz, null);
+  updateCard('cardFlamme2','flammeVal2','badgeFlamme2','progressFlamme2',null,
+    flamme, fA?'danger':'safe', fA?'FLAMME!':'PAS DE FLAMME',
+    fA?'badge-danger':'badge-safe', fA?'fill-danger':'fill-safe',
+    fA?'var(--accent-fire)':'var(--safe)', pFlamme, null);
+
+  updateLCD(tA, gA, fA);
 }
 
 function updateCard(cId,vId,bId,pId,sId,val,cls,bText,bCls,fCls,vColor,pW,sText){
@@ -1065,17 +1041,28 @@ function updateCard(cId,vId,bId,pId,sId,val,cls,bText,bCls,fCls,vColor,pW,sText)
   if(sId){const s=document.getElementById(sId);if(s)s.textContent=sText;}
 }
 
-function updateLCD(t,g,f){
-  const l1=document.getElementById('lcdLine1'),l2=document.getElementById('lcdLine2');
-  if(!l1||!l2)return;
-  if(f){
-    if(t&&g){l1.textContent='RISQUE EXPLOSION';l2.textContent='FLAMME DETECTEE!!';}
-    else{l1.textContent='FLAMME DETECTEE!';l2.textContent='POMPE ACTIVEE...';}
-    l1.style.color='#ff4500';l2.style.color='#ff4500';
-  }else if(t&&g){l1.textContent='RISQUE EXPLOSION';l2.textContent='TEMP+GAZ CRITIQ!';l1.style.color='#ffb300';l2.style.color='#ffb300';}
-  else if(t){l1.textContent='ALERTE TEMP     ';l2.textContent='VERIFICEZ SITE!!';l1.style.color='#00d4ff';l2.style.color='#00d4ff';}
-  else if(g){l1.textContent='ALERTE GAZ MQ-2 ';l2.textContent='VERIFICEZ SITE!!';l1.style.color='#ffb300';l2.style.color='#ffb300';}
-  else{l1.textContent='SYSTEME NORMAL  ';l2.textContent='TOUT VA BIEN :) ';l1.style.color='#00ff41';l2.style.color='#00ff41';}
+function updateLCD(t, g, f){
+  const l1=document.getElementById('lcdLine1'), l2=document.getElementById('lcdLine2');
+  if(!l1||!l2) return;
+  const cs = currentSensors;
+  // Ligne 2 : T:XXC G:XXX F:XXXX  (identique à l'Arduino)
+  const tStr = cs.temp < 10 ? ' '+Math.round(cs.temp) : Math.round(cs.temp);
+  const gStr = cs.gaz < 100 ? (cs.gaz < 10 ? '  '+cs.gaz : ' '+cs.gaz) : cs.gaz;
+  l2.textContent = 'T:'+tStr+'C G:'+gStr+' F:'+cs.flamme;
+  l2.style.color = '#00ff41';
+  // Ligne 1 : messages identiques à l'Arduino
+  if(systemeVerrouille || f){
+    if(systemeVerrouille){ l1.textContent='BLOCAGE INCENDIE'; l1.style.color='#ff4500'; }
+    else                 { l1.textContent='>>> INCENDIE !!! '; l1.style.color='#ff4500'; }
+  } else if(g && t){
+    l1.textContent='RISQUE EXPLOSION'; l1.style.color='#ffb300';
+  } else if(g){
+    l1.textContent='ALERTE GAZ !    '; l1.style.color='#ffb300';
+  } else if(t){
+    l1.textContent='TEMP. DANGER!   '; l1.style.color='#00d4ff';
+  } else {
+    l1.textContent='SYSTEME OK      '; l1.style.color='#00ff41';
+  }
 }
 
 // ============ SUPABASE ============
@@ -1090,9 +1077,10 @@ async function fetchSupabase(){
     const data=await res.json();
     if(data&&data.length>0){
       const d=data[0];
-      const temp  = parseFloat(d.temperature) || 0;
-      const gaz   = parseInt(d.gaz)           || 0;
-      const flamme = parseInt(d.flamme)        || 1023; // valeur analogique réelle 0-1023
+      // Valeurs exactes de l'Arduino — flamme est un entier 0-4095
+      const temp   = parseFloat(d.temperature) || 0;
+      const gaz    = parseInt(d.gaz)           || 0;
+      const flamme = parseInt(d.flamme)        || 4095;
       updateSensors(temp, gaz, flamme);
       if(d.verrouille && !fireState) simulateFire();
       else if(!d.verrouille && fireState) simulateNormal();
@@ -1100,8 +1088,8 @@ async function fetchSupabase(){
     }
   }catch(err){
     lastFetchFailed=true;
-    if(fireState)updateSensors(randomBetween(58,72),randomBetween(380,460),randomBetween(140,240));
-    else updateSensors(randomBetween(22,36),randomBetween(80,180),randomBetween(700,950));
+    if(fireState) updateSensors(randomBetween(33,38), randomBetween(420,500), randomBetween(800,2000));
+    else             updateSensors(randomBetween(24,30), randomBetween(80,250),  randomBetween(3200,4095));
     document.getElementById('esp32Dot').className='status-dot warning';
     document.getElementById('esp32Status').textContent='En attente ESP32...';
   }
@@ -1140,15 +1128,15 @@ function buildCharts(){
   const gazData=labels.map((_,i)=>i>48?randomBetween(380,460):i>43?200+(i-43)*30:randomBetween(80,180));
   const flammeData=labels.map((_,i)=>i>52?randomBetween(140,240):randomBetween(700,1000));
   const opts=()=>({responsive:true,animation:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1420',borderColor:'#1a2e45',borderWidth:1,titleColor:'#e8f0fe',bodyColor:'#7a9cc0',padding:10}},scales:{x:{ticks:{color:'#3a5a7a',font:{family:'Share Tech Mono',size:9},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.03)'}},y:{ticks:{color:'#3a5a7a',font:{family:'Share Tech Mono',size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}});
-  new Chart(document.getElementById('chartTemp'),{type:'line',data:{labels,datasets:[{data:tempData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(40),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
-  new Chart(document.getElementById('chartGaz'),{type:'line',data:{labels,datasets:[{data:gazData,borderColor:'#ffb300',backgroundColor:'rgba(255,179,0,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(300),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
-  new Chart(document.getElementById('chartFlamme'),{type:'line',data:{labels,datasets:[{data:flammeData,borderColor:'#ff4500',backgroundColor:'rgba(255,69,0,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(300),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
+  new Chart(document.getElementById('chartTemp'),{type:'line',data:{labels,datasets:[{data:tempData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(32),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
+  new Chart(document.getElementById('chartGaz'),{type:'line',data:{labels,datasets:[{data:gazData,borderColor:'#ffb300',backgroundColor:'rgba(255,179,0,0.06)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(400),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
+  new Chart(document.getElementById('chartFlamme'),{type:'line',data:{labels,datasets:[{data:flammeData,borderColor:'#ff4500',backgroundColor:'rgba(255,69,0,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.4},{data:Array(60).fill(3000),borderColor:'rgba(255,23,68,0.4)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}]},options:opts()});
 }
 
 document.querySelectorAll('.filter-btn').forEach(btn=>{btn.addEventListener('click',function(){document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');showToast(`📊 Plage : ${this.textContent}`,'info');});});
 
 // ============ INIT ============
-updateSensors(26,120,820);
+updateSensors(26, 120, 3800); // valeurs initiales normales (flamme haute = pas de feu)
 updateAI(false);
 addHistoryEvent('SIDIRT démarré — Système opérationnel','systeme','OK','safe');
 </script>
